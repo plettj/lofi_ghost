@@ -1,6 +1,10 @@
-// GLOBAL, INITIALIZATION, & EVENTS
+///////////
+// GLOBAL INFO, INITIALIZATION, & EVENTS
+///////////
 
+///////////
 // GLOBAL INFORMATION
+///////////
 let GI = {
   unit: 1, // The game unit, in computer pixels (dynamically calculated)
   width: 32, // Game area width in Units
@@ -14,7 +18,7 @@ let GI = {
   }
 }
 
-let StorageManager = {
+let Storage = {
   storedName: "UWGameJam_SavedData",
   splashScreen: false, // Whether to display the splash screen on game load
   currentData: { // All save-able game data goes here!
@@ -36,91 +40,52 @@ let StorageManager = {
   }
 }
 
-let previousSaved = localStorage.getItem('UWGameJam_SavedData');
-
-let veryveryfirst = false;
-
-if (!previousSaved) { // Nothing has been saved in localStorage
-    setTimeout(function () {
-      save();
-    }, 2000);
-} else { // update based on save
-    saved = JSON.parse(localStorage.getItem('saved'));
-    beginningLevel = saved["bestLevel"];
-    powers = [saved["powers"][0], saved["powers"][1]];
-    autoStart = saved["autoStart"];
-    statisticTwo = saved["statisticTwo"];
-    if (saved["darkMode"]) {
-        document.body.style.setProperty("--darkMode", "rgba(220, 220, 220, 0.4)");
-        document.body.style.setProperty("--darkMode2", "rgba(0, 0, 0, 0.05)");
-        document.body.style.setProperty("--pauseButton", 'url("imagesTwo/Pause.png")');
-        graphics = "imagesTwo";
-    }
-    if (statisticTwo) GFuel = 1;
-    else GFuel = 3;
-    if (saved["scores"].length < 1) {
-        veryveryfirst = true;
-    } else {
-        document.body.querySelector("#TitleScreen").style.display = "none";
-        gameBegun = true;
-        paused = false;
-    }
-    // saved["scores"] is done over in the map.js file
-}
-
-// localStorage.setItem('saved', JSON.stringify(saved));
-// saved = JSON.parse(localStorage.getItem('saved'));
-
-setTimeout(function () {
-    document.body.querySelector("#ProgressFill").classList.remove("silver");
-    document.body.querySelector("#ProgressFill").classList.add("gold");
-}, 3000);
+///////////
 // INITIALIZATION
-
-// Canvas holder
-let ctx = []; // [0-background, 1-blocks, 2-mainObjects, 3-ghosts, 4-ghostBlocks, 5-avatar, 6-frontObjects, 7-frontER_Objects(goal, items) :last:-LCanvas]
-function makeContexts(num) {
+///////////
+let Screen = {
+  layers: 6, // Total layers on our screen
+  contexts: [],
+  
+  init: () => {
     for (let i = 0; i < num; i++) {
-        let canvas = document.createElement("CANVAS");
-        canvas.id = "Canvas" + i;
-        canvas.width = unit * width;
-        canvas.height = unit * height;
-        document.body.insertBefore(canvas, document.querySelector(".belowCanvases"));
-        let thisCTX = canvas.getContext('2d');
-        thisCTX.imageSmoothingEnabled = false;
-        ctx.push(thisCTX);
-    }
-    let miniC = document.body.querySelector("#LCanvas");
-    miniC.width = unit * width * 0.32;
-    miniC.height = unit * height * 0.32;
-    ctx.push(miniC.getContext('2d'));
-}
-makeContexts(8);
-ctx[4].globalAlpha = 0.5;
+      let canvas = document.createElement("CANVAS");
+      canvas.id = "Canvas" + i;
+      canvas.width = unit * width;
+      canvas.height = unit * height;
+      document.body.insertBefore(canvas, document.querySelector(".belowCanvases"));
 
-// Image holder
-let img = [];
-function makeImages(srcs) {
-    for (let i = 0; i < srcs.length; i++) {
-        let image = new Image();
-        image.src = graphics + "/" + srcs[i];
-        img.push(image);
+      let thisCTX = canvas.getContext('2d');
+      thisCTX.imageSmoothingEnabled = false;
+      ctx.push(thisCTX);
     }
-}
-makeImages(["BlockTileset.png", "Background.png", "AvatarTileset.png", "Objects.png"]);
-
-// *** Where it all starts ***
-window.onload = function () {
-    score.init();
-    if (!veryveryfirst) {
-        levels.startLevel(beginningLevel);
-        levels.drawLevel(beginningLevel, true);
-        startAnimating(60); // 60 fps
-    }
-    ctx[0].drawImage(img[1], 0, 0, unit * width, unit * height);
-    setTimeout(visible, 300); // should be the length of menu animation
+  }
 }
 
+let Assets = {
+  names: [], // List with each tileset's name
+  sources: [],
+
+  init: () => {
+    for (const item of names) {
+      let image = new Image();
+      image.src = graphics + "/" + item;
+      sources.push(image);
+    }
+  }
+}
+
+let Animator = {
+  frame: 0,
+  fps, fpsInterval, startTime, now, then, elapsed,
+
+  startAnimating: () => {
+    fpsInterval = 1000 / fps;
+    then = Date.now();
+    startTime = then;
+    animate();
+  }
+}
 // To run actual frame-by-frame animation
 var stop = false;
 var frameCount = 0;
@@ -175,8 +140,9 @@ function animate() {
     }
 }
 
+///////////
 // EVENTS
-
+///////////
 function keyPressed(code, num) {
     if (!paused || !num) {
         if ((code == 37 || code == 65) && !avatar.complete) avatar.keys[0] = num; // Left
@@ -191,7 +157,7 @@ function keyPressed(code, num) {
 }
 
 document.addEventListener("keydown", function(event) {
-    let k = event.keyCode;
+    let k = event.code;
     if (k == 9 || k == 38 || k == 40) {
         event.preventDefault();
     } else if (k == 123 || (event.ctrlKey && event.shiftKey && (k == 73 || k == 74))) {
@@ -202,7 +168,7 @@ document.addEventListener("keydown", function(event) {
 }, false);
 
 document.addEventListener("keyup", function(event) {
-	keyPressed(event.keyCode, 0);
+	keyPressed(event.code, 0);
 });
 
 document.addEventListener("mousedown", function (e) { // stops blurring
@@ -211,3 +177,16 @@ document.addEventListener("mousedown", function (e) { // stops blurring
 });
 
 document.addEventListener('contextmenu', event => event.preventDefault());
+
+///////////
+// WHERE IT ALL STARTS
+///////////
+window.onload = function () {
+  GI.init();
+  Storage.init();
+  Screen.init();
+  Assets.init();
+  
+  // START THE GAME (might delay this later)
+  startAnimating(60); // 60 fps
+}
