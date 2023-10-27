@@ -12,9 +12,13 @@ let GI = {
   res: 8, // Art pixels / unit
   pixel: 1, // Computer pixels / Art pixel
 
-  init: () => {
-    this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (width + 0.5) / 4) * 4;
-    this.pixel = unit / 8;
+  init: function () {
+    this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
+    this.pixel = this.unit / 8;
+    
+    document.body.style.setProperty("--unit", this.unit + "px");
+    document.body.style.setProperty("--width", this.width);
+    document.body.style.setProperty("--height", this.height);
   }
 }
 
@@ -25,18 +29,21 @@ let Storage = {
     "progress": 0,
   },
 
-  init: () => {
-    let savedData = localStorage.getItem(storedName);
+  init: function () {
+    let savedData = localStorage.getItem(this.storedName);
 
     if (!savedData) { // Nothing was previously saved in the browser.
-      setTimeout(function () { this.store(); }, 2000);
+      setTimeout(function () { Storage.store(); }, 2000);
     } else { // Update our data based on what was saved.
-      currentData = JSON.parse(savedData);
+      this.currentData = JSON.parse(savedData);
 
-      if (currentData["progress"] === 0) {
-        splashScreen = true;
+      if (this.currentData["progress"] === 0) {
+        this.splashScreen = true;
       }
     }
+  },
+  store: function () {
+    localStorage.setItem(this.storedName, JSON.stringify(this.currentData));
   }
 }
 
@@ -44,20 +51,20 @@ let Storage = {
 // INITIALIZATION
 ///////////
 let Screen = {
-  layers: 6, // Total layers on our screen
+  layers: 2, // Total layers on our screen
   contexts: [],
   
-  init: () => {
-    for (let i = 0; i < num; i++) {
+  init: function () {
+    for (let i = 0; i < this.layers; i++) {
       let canvas = document.createElement("CANVAS");
       canvas.id = "Canvas" + i;
-      canvas.width = unit * width;
-      canvas.height = unit * height;
+      canvas.width = GI.unit * GI.width;
+      canvas.height = GI.unit * GI.height;
       document.body.insertBefore(canvas, document.querySelector(".belowCanvases"));
 
-      let thisCTX = canvas.getContext('2d');
-      thisCTX.imageSmoothingEnabled = false;
-      ctx.push(thisCTX);
+      let context = canvas.getContext('2d');
+      context.imageSmoothingEnabled = false;
+      this.contexts.push(context);
     }
   }
 }
@@ -66,11 +73,11 @@ let Assets = {
   names: [], // List with each tileset's name
   sources: [],
 
-  init: () => {
-    for (const item of names) {
+  init: function () {
+    for (let i = 0; i < this.names.length; i++) {
       let image = new Image();
-      image.src = graphics + "/" + item;
-      sources.push(image);
+      image.src = graphics + "/" + this.names[i];
+      this.sources.push(image);
     }
   }
 }
@@ -78,25 +85,30 @@ let Assets = {
 let Animator = {
   frame: 0,
   paused: false,
-  fpsInterval, startTime, now, then, elapsed,
+  fps: 60,
+  fpsInterval: 0,
+  startTime: 0,
+  now: 0,
+  then: 0,
+  elapsed: 0,
 
-  startAnimating: (fps) => {
-    fpsInterval = 1000 / fps;
-    then = Date.now();
-    startTime = then;
+  startAnimating: function () {
+    this.fpsInterval = 1000 / this.fps;
+    this.then = Date.now();
+    this.startTime = this.then;
+
     this.animate();
   },
   animate: () => {
-    requestAnimationFrame(animate);
-    now = Date.now();
-    elapsed = now - then;
+    requestAnimationFrame(() => { Animator.animate(); });
+    Animator.now = Date.now();
+    Animator.elapsed = Animator.now - Animator.then;
 
-    if (elapsed > fpsInterval) { // If enough time has elapsed, draw the next frame
-      then = now - (elapsed % fpsInterval);
+    if (Animator.elapsed > Animator.fpsInterval) { // If enough time has elapsed, draw the next frame
+      Animator.then = Animator.now - (Animator.elapsed % Animator.fpsInterval);
       
-      if (!paused) { // GAME LOOP
-        avatar.physics();
-        frame++;
+      if (!Animator.paused) { // GAME LOOP
+        Animator.frame++;
       }
     }
   }
@@ -106,7 +118,7 @@ let Animator = {
 // EVENTS
 ///////////
 function keyPressed(code, pressed) {
-  if (!paused || !pressed) {
+  if (!Animator.paused || !pressed) {
     if ((code == 37 || code == 65)) return; // Left
     else if ((code == 38 || code == 87)) return; // Up
     else if ((code == 39 || code == 68)) return; // Right
@@ -145,15 +157,11 @@ document.addEventListener('contextmenu', (event) => {
 // WHERE IT ALL STARTS
 ///////////
 window.onload = () => {
-  // main.js
   GI.init();
   Storage.init();
   Screen.init();
   Assets.init();
-  // script.js
-  Canvases.init();
-  Graphics.init();
   
   // START THE GAME (might delay this later)
-  Animator.startAnimating(60); // 60 fps
+  Animator.init();
 }

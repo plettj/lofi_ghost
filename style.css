@@ -1,0 +1,38 @@
+* {
+  margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+
+
+@font-face {
+  font-family: Arcology; src: url('fonts/Arcology.ttf');
+}
+@font-face {
+  font-family: VCR_OSD; src: url('fonts/VCR_OSD_MONO_1.001.ttf');
+}
+@font-face {
+  font-family: D_D; src: url('fonts/DisposableDroidBB.ttf');
+}
+@font-face {
+  font-family: D_D_I; src: url('fonts/DisposableDroidBB_ital.ttf');
+}
+
+body {
+  background-color: black;
+  --unit: 5px; /* Updated by JS */
+  --width: 10; /* Updated by JS */
+  --height: 5; /* Updated by JS */
+
+  overflow: hidden;
+  font-family: Arcology;
+  color: cyan;
+}
+
+canvas {
+  position: absolute;
+  left: calc((100% - var(--unit) * var(--width)) / 2);
+  top: calc((100% - var(--unit) * var(--height)) / 2);
+  background-color: white;
+}
