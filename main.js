@@ -92,7 +92,7 @@ let Animator = {
   then: 0,
   elapsed: 0,
 
-  startAnimating: function () {
+  init: function () {
     this.fpsInterval = 1000 / this.fps;
     this.then = Date.now();
     this.startTime = this.then;
