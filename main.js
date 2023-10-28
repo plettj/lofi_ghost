@@ -18,7 +18,7 @@ const GI = {
   canvasWidth: 0,
   canvasHeight: 0,
 
-  // cursor
+  // cursor, relative to canvas
   cursorX: 0,
   cursorY: 0,
 
@@ -233,19 +233,19 @@ function dist(x1, y1, x2, y2  ) {
   return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
 }
 
+function calcAngle2(dx, dy) {
+  return Math.atan2(dy, dx) / Math.PI * 180 + 180;
+}
+
 function toDirection(angle) {
-  return Math.floor(angle / 45);
+  return Math.floor(angle / 90);
 }
 
 const Dir = {
-  W: 0,
-  NW: 1,
-  N: 2,
+  NW: 0,
+  SW: 1,
+  SE: 2,
   NE: 3,
-  E: 4,
-  SE: 5,
-  S: 6,
-  SW: 7,
 };
 
 
@@ -265,7 +265,7 @@ const Ghost = {
   bobbingPhase: 0,
 
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
-  states: { // GFUEL states
+  states: {
     follow: 0,
     static: 1,
     keys: 2,
@@ -280,11 +280,9 @@ const Ghost = {
   },
 
   update: function() {
-    const [tileX, tileY] = BaseMap.tilePos(this.x, this.y);
-    const tileState = BaseMap.tileState(this.x, this.y);
 
-    if (!BaseMap.cursorInBounds()) this.GFUEL = this.states.static;
-    else this.GFUEL = this.states.follow;
+    if (BaseMap.cursorInBounds()) this.GFUEL = this.states.follow;
+    else this.GFUEL = this.states.static;
 
     switch(this.GFUEL) {
       case this.states.follow: // Follow cursor
@@ -297,7 +295,7 @@ const Ghost = {
         this.x += (dx - GI.spriteSize / 4) / distance * cappedSpeed;
         this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
 
-        this.angle = Math.atan2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4) / Math.PI * 180 + 180;
+        this.angle = calcAngle2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4);
 
         this.adjustBob();
         break;
@@ -314,27 +312,29 @@ const Ghost = {
 
   updateSprite: function() {
     switch (this.direction) {
-      case Dir.N: [this.spriteRow, this.spriteCol] = [0, 0]; break;
-      case Dir.NE: [this.spriteRow, this.spriteCol] = [1, 0]; break;
-      case Dir.E: [this.spriteRow, this.spriteCol] = [0, 1]; break;
-      case Dir.SE: [this.spriteRow, this.spriteCol] = [1, 1]; break;
-      case Dir.S: [this.spriteRow, this.spriteCol] = [3, 0]; break;
-      case Dir.SW: [this.spriteRow, this.spriteCol] = [3, 1]; break;
-      case Dir.W: [this.spriteRow, this.spriteCol] = [2, 1]; break;
-      case Dir.NW: [this.spriteRow, this.spriteCol] = [2, 0]; break;
+      case Dir.NW: this.spriteCol = 2; break;
+      case Dir.NE: this.spriteCol = 1; break;
+      case Dir.SE: this.spriteCol = 0; break;
+      case Dir.SW: this.spriteCol = 3; break;
     }
+    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 2;
   },
 
   draw: function() {
     Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
-    this.spritemap.drawTile(Screen.ghost, this.spriteRow, this.spriteCol, this.x, this.y);
+    this.spritemap.drawTile(Screen.ghost, this.spriteCol, this.spriteRow, this.x, this.y);
   },
 
-  adjustBob: function() { // controls bobbing height
+  adjustBob: function() { // manages bobbing height
     this.y += this.bobbingAmplitude * Math.sin(this.bobbingPhase);
     this.bobbingPhase += this.bobbingFrequency;
   }
 }
+
+class HardwareBug {
+  //
+};
+
 
 ///////////
 // MAP
@@ -342,31 +342,15 @@ const Ghost = {
 
 const BaseMap = {
   map: [
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-  ],
-
-  mapPadded: [
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-    [-1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
-    [-1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, -1],
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   ],
 
   tilePos: function(x, y) {
@@ -378,17 +362,12 @@ const BaseMap = {
     return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
   },
 
-  tileState: function(x, y) {
-    if (!BaseMap.cursorInBounds()) return [[-1, -1, -1], [-1, -1, -1], [-1, -1, -1]];
-    const [tileX, tileY] = this.tilePos(x, y);
-    return [
-      this.mapPadded[tileY    ].slice(tileX, tileX + 3),
-      this.mapPadded[tileY + 1].slice(tileX, tileX + 3),
-      this.mapPadded[tileY + 2].slice(tileX, tileX + 3)];
+  inBounds: function(x, y) {
+    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight)
   },
 
   cursorInBounds: function() {
-    return between(GI.cursorX, 0, GI.canvasWidth) && between(GI.cursorY, 0, GI.canvasHeight)
+    return this.inBounds(GI.cursorX, GI.cursorY);
   }
 }
 
