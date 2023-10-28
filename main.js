@@ -22,6 +22,9 @@ const GI = {
   cursorX: 0,
   cursorY: 0,
 
+  // level
+  level: 0,
+
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
     this.pixel = this.unit / 8;
@@ -104,6 +107,12 @@ const Screen = {
       GI.canvasHeight = rect.height;
     }
   },
+
+  clear: function() {
+    for (let i = 0; i < this.layers; ++i) {
+      this.contexts[i].clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    }
+  }
 }
 
 class Spritemap {
@@ -120,6 +129,11 @@ class Spritemap {
   }
 
   drawTile(context, x, y, destX, destY) {
+    const [xT, yT] = this.getTileCoordinates(x, y);
+    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
+  }
+
+  drawTileAtAngle(context, x, y, destX, destY, angle) {
     const [xT, yT] = this.getTileCoordinates(x, y);
     context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
   }
@@ -250,6 +264,14 @@ function toCardinal(angle) {
   return Math.floor(((angle + 45) % 360) / 90);
 }
 
+function dcos(angle) {
+  return Math.cos(angle / 180 * Math.PI);
+}
+
+function dsin(angle) {
+  return Math.sin(angle / 180 * Math.PI);
+}
+
 const Direction = {
   NW: 0,
   NE: 1,
@@ -289,8 +311,11 @@ const Ghost = {
   spriteCol: 0,
   spriteRow: 0,
 
+  spookRange: 0,
+
   init: function() {
     this.spritemap = Assets.spritemaps[0];
+    this.spookRange = GI.unit * 2;
   },
 
   update: function() {
@@ -303,14 +328,14 @@ const Ghost = {
         this.adjustBob();
         break;
       case this.states.follow: // Follow cursor
-        const dx = GI.cursorX - this.x;
-        const dy = GI.cursorY - this.y;
+        const dx = clamp(GI.cursorX, GI.unit / 2, GI.canvasWidth - GI.unit / 2) - this.x;
+        const dy = clamp(GI.cursorY, GI.unit / 2, GI.canvasHeight - GI.unit / 2) - this.y;
 
         const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
         const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
 
         this.x += dx / distance * cappedSpeed;
-        this.y += (dy + GI.unit) / distance * cappedSpeed;
+        this.y += dy / distance * cappedSpeed;
 
         this.angle = calcAngle2(dx, dy);
 
@@ -345,13 +370,36 @@ const Ghost = {
   }
 }
 
-class WireBug {
+class WireSpot {
   constructor(tileX, tileY) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
-    this.speed = 10;
+    this.activated = false;
+    this.range = GI.unit * 2;
+  }
+
+  draw() {
+    //
+  }
+}
+
+class WireBug {
+  constructor(tileX, tileY, wireSpot) {
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.speed = 3;
     this.angle = 0;
-    this.direction = Direction.N;
-    this.runDist = 0;
+    this.runDist = GI.unit * 2;
+    this.dx = 0;
+    this.dy = 0;
+
+    this.wireSpot = wireSpot;
+
+    this.state = 0;
+    this.states = {
+      idle: 0,
+      running: 1,
+      wiring: 2,
+      wired: 3,
+    }
 
     this.spritemap = Assets.spritemaps[1];
     this.spriteCol = 0;
@@ -359,26 +407,53 @@ class WireBug {
   }
 
   update() {
-    if (dist(Ghost.x, Ghost.y, this.x, this.y) < 100) {
-      this.runDist = GI.unit * 3;
+
+    // the following is code
+    if (this.wirespot && dist(this.wireSpot.x, this.wireSpot.y, this.x, this.y) < this.wireSpot) {
+      this.targetX = this.wireSpot.x;
+      this.targetY = this.wireSpot.y;
+      this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
+      this.state = this.states.wiring;
+    } else if (this.state != this.states.running && dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+      this.angle = calcAngle2(Ghost.x - this.x, Ghost.y - this.y);
+      this.targetX = clamp(this.x + this.runDist * dcos(this.angle), GI.unit, GI.canvasWidth - GI.unit);
+      this.targetY = clamp(this.y + this.runDist * dsin(this.angle), GI.unit, GI.canvasHeight - GI.unit);
+      this.state = this.states.running;
+    } else if (this.x == this.targetX && this.y == this.targetY) {
+      this.state = this.states.idle;
     }
 
-    if (this.runDist != 0) {
-      this.angle = reverseAngle(calcAngle2(Ghost.x - this.x, Ghost.y - this.y));
-      this.direction = toCardinal(this.angle);
-      const cappedSpeed = Math.min(this.speed, this.runDist / Animator.fps);
+    const distance = dist(this.x, this.y, this.targetX, this.targetY);
+    switch (this.state) {
+      case this.states.idle:
+        break;
+      case this.states.running:
+        if (distance > this.speed) {
+          this.x += dcos(this.angle) * this.speed;
+          this.y += dsin(this.angle) * this.speed;
+        } else {
+          this.x = this.targetX;
+          this.y = this.targetY;
+        }
+        break;
+      case this.states.wiring:
+        if (distance > this.speed) {
+          this.x += dcos(this.angle) * this.speed;
+          this.y += dsin(this.angle) * this.speed;
+        } else {
+          this.x = this.targetX;
+          this.y = this.targetY;
+          this.state = this.states.wired;
+        }
+        break;
+      case this.states.wired:
+        break;
     }
 
     this.updateSprite();
   }
 
   updateSprite() {
-    switch (this.direction) {
-      case Direction.N: this.spriteCol = 2; break;
-      case Direction.W: this.spriteCol = 1; break;
-      case Direction.S: this.spriteCol = 0; break;
-      case Direction.E: this.spriteCol = 3; break;
-    }
     if (this.runDist > 0 && Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
   }
 
@@ -407,6 +482,25 @@ const BugManager = {
     }
   }
 }
+
+class LetterBlock {
+  constructor(tileX, tileY) {
+    this.tileX = tileX;
+    this.tileY = tileY;
+    this.letter = 0;
+
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.speed = 10;
+    this.moveDirection = Direction.N;
+    this.xTable = [-this.runDist, 0, this.runDist, 0];
+    this.yTable = [0, -this.runDist, 0, this.runDist];
+  }
+
+  update() {
+    const angle = reverseAngle(calcAngle2(Ghost.x - this.x, Ghost.y - this.y));
+    this.moveDirection = toCardinal(angle);
+  }
+};
 
 
 ///////////
@@ -446,31 +540,73 @@ const BaseMap = {
     return this.inBounds(GI.cursorX, GI.cursorY);
   },
 
+  // Sprite bounds helpers
+  collisionWest: function(x) {
+    return x < 0;
+  },
+
+  collisionNorth: function(y) {
+    return y < 0;
+  },
+
+  collisionEast: function(x) {
+    return x < GI.canvasWidth;
+  },
+
+  collisionSouth: function(y) {
+    return y < GI.canvasHeight;
+  },
+
+  collisionV: function(y) {
+    return this.collisionNorth(y - GI.unit / 2) || this.collisionSouth(y + GI.unit / 2);
+  },
+
+  collisionH: function(x) {
+    return this.collisionWest(x - GI.unit / 2) || this.collisionEast(x + GI.unit / 2);
+  },
+
   spriteInBounds: function(x, y) {
-    return 
+    return !this.collisionV(y) && !this.collisionH(x);
   },
 }
 
 const HardwareLayer = {
-  curr: 0,
+  init: function() {
+    Ghost.init();
+    BugManager.init();
+  },
 
+  update: function() {
+    Ghost.update();
+    BugManager.updateBugs();
+  },
+
+  draw: function() {
+    // draw bg
+    Ghost.draw();
+    BugManager.drawBugs();
+  },
+}
+
+const CLILayer = {
   init: function() {
     //
   },
 
-  drawLevel: function() {
-    for (let y = 0; y < GI.height; ++y) {
-      for (let x = 0; x < GI.width; ++x) {
-        
-      }
-    }
-  },
-
-  advanceLevel: function() {
-    this.curr++
+  draw: function() {
+    //
   }
 }
 
+const MenuLayer = {
+  init: function() {
+    //
+  },
+
+  draw: function() {
+    //
+  }
+}
 
 ///////////
 // WHERE IT ALL STARTS
@@ -489,23 +625,29 @@ window.onload = () => {
     GI.cursorY = e.clientY - GI.canvasY;
   }, false);
 
-  Ghost.init();
-  BugManager.init();
-
   // temp background
   Screen.void.fillStyle = "white";
   Screen.void.fillRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+
+  // Init first level
+  HardwareLayer.init();
 
   // Start game loop
   Animator.start();
 }
 
 function updateAll() {
-  Ghost.update();
-  BugManager.updateBugs();
+  switch(GI.level) {
+    case 0: HardwareLayer.update(); break;
+    case 1: CLILayer.update(); break;
+    case 2: MenuLayer.update(); break;
+  }
 }
 
 function drawAll() {
-  Ghost.draw();
-  BugManager.drawBugs();
+  switch(GI.level) {
+    case 0: HardwareLayer.draw(); break;
+    case 1: CLILayer.draw(); break;
+    case 2: MenuLayer.draw(); break;
+  }
 }
