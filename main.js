@@ -464,11 +464,12 @@ class WireBug {
 };
 
 const BugManager = {
-  wirebugs: [],
+  bugs: [],
 
   init: function() {
-    
-    this.wirebugs.push(new WireBug(5, 5));
+    const wireSlot1 = new WireSlot(8, 8);
+    wireSlot1.draw();
+    this.bugs.push(new WireBug(5, 5, wireSlot1));
   },
 
   updateBugs: function() {
