@@ -1,16 +1,26 @@
 ///////////
-// GLOBAL INFO, INITIALIZATION, & EVENTS
-///////////
-
-///////////
 // GLOBAL INFORMATION
 ///////////
-let GI = {
+const GI = {
+  // units
   unit: 1, // The game unit, in computer pixels (dynamically calculated)
-  width: 32, // Game area width in Units
-  height: 18,
+  width: 16, // Game area width in Units
+  height: 9,
   res: 8, // Art pixels / unit
   pixel: 1, // Computer pixels / Art pixel
+
+  // sprite maps
+  spriteSize: 80, // width == height
+
+  // canvas
+  canvasX: 0,
+  canvasY: 0,
+  canvasWidth: 0,
+  canvasHeight: 0,
+
+  // cursor, relative to canvas
+  cursorX: 0,
+  cursorY: 0,
 
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
@@ -22,7 +32,7 @@ let GI = {
   }
 }
 
-let Storage = {
+const Storage = {
   storedName: "UWGameJam_SavedData",
   splashScreen: false, // Whether to display the splash screen on game load
   currentData: { // All save-able game data goes here!
@@ -47,13 +57,22 @@ let Storage = {
   }
 }
 
+
 ///////////
-// INITIALIZATION
+// GAME LOOP
 ///////////
-let Screen = {
-  layers: 2, // Total layers on our screen
+const Screen = {
+  layers: 8, // Total layers on our screen
   contexts: [],
-  
+
+  // layer aliases
+  void: null,
+  background: null,
+  objects: null,
+  bugs: null,
+  ghost: null,
+  screen: null,
+
   init: function () {
     let belowCanvases = document.querySelector(".belowCanvases");
     for (let i = 0; i < this.layers; i++) {
@@ -67,23 +86,59 @@ let Screen = {
       context.imageSmoothingEnabled = false;
       this.contexts.push(context);
     }
+
+    this.void = this.contexts[0];
+    this.backgound = this.contexts[1]; // floor and solid walls
+    // underground??
+    this.objects = this.contexts[5];
+    this.bugs = this.contexts[6];
+    this.ghost = this.contexts[7];
+
+    const canvas = document.getElementById("Canvas0");
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      GI.canvasX = rect.left;
+      GI.canvasY = rect.top;
+      GI.canvasWidth = rect.width;
+      GI.canvasHeight = rect.height;
+    }
+  },
+}
+
+class Spritemap {
+  constructor(image) {
+    this.image = image;
+    this.width = image.width;
+    this.height = image.height;
+    this.col = Math.floor(this.width / GI.spriteSize);
+    this.row = Math.floor(this.height / GI.spriteSize);
+  }
+  
+  getTileCoordinates(x, y) {
+    return [x * GI.spriteSize, y * GI.spriteSize];
+  }
+
+  drawTile(context, x, y, destX, destY) {
+    const [xT, yT] = this.getTileCoordinates(x, y);
+    context.drawImage(this.image, xT, yT, GI.spriteSize, GI.spriteSize, destX, destY, GI.unit, GI.unit);
   }
 }
 
-let Assets = {
-  names: [], // List with each tileset's name
-  sources: [],
+const Assets = {
+  spritemapNames: ["ghost", "hardwarebug"],
+  spritemapsPath: "assets/spritemaps",
+  spritemaps: [],
 
   init: function () {
-    for (let i = 0; i < this.names.length; i++) {
+    for (let i = 0; i < this.spritemapNames.length; i++) {
       let image = new Image();
-      image.src = graphics + "/" + this.names[i];
-      this.sources.push(image);
+      image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
+      this.spritemaps.push(new Spritemap(image));
     }
-  }
+  },
 }
 
-let Animator = {
+const Animator = {
   frame: 0,
   paused: false,
   fps: 60,
@@ -97,9 +152,12 @@ let Animator = {
     this.fpsInterval = 1000 / this.fps;
     this.then = Date.now();
     this.startTime = this.then;
+  },
 
+  start: function () {
     this.animate();
   },
+
   animate: () => {
     requestAnimationFrame(() => { Animator.animate(); });
     Animator.now = Date.now();
@@ -109,15 +167,19 @@ let Animator = {
       Animator.then = Animator.now - (Animator.elapsed % Animator.fpsInterval);
       
       if (!Animator.paused) { // GAME LOOP
+        updateAll();
+        drawAll();
         Animator.frame++;
       }
     }
   }
 }
 
+
 ///////////
 // EVENTS
 ///////////
+
 function keyPressed(code, pressed) {
   if (!Animator.paused || !pressed) {
     if ((code == 37 || code == 65)) return; // Left
@@ -154,14 +216,209 @@ document.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
+
+///////////
+// UTIL
+///////////
+
+function between(x, a, b) {
+  return (x < Math.max(a, b)) && (x > Math.min(a, b));
+}
+
+function clamp(x, a, b) {
+  return Math.min(Math.max(x, Math.min(a, b)), Math.max(a, b));
+}
+
+function dist(x1, y1, x2, y2  ) {
+  return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+}
+
+function calcAngle2(dx, dy) {
+  return Math.atan2(dy, dx) / Math.PI * 180 + 180;
+}
+
+function toDirection(angle) {
+  return Math.floor(angle / 90);
+}
+
+const Dir = {
+  NW: 0,
+  SW: 1,
+  SE: 2,
+  NE: 3,
+};
+
+
+///////////
+// WORLD
+///////////
+
+const Ghost = {
+  x: 0,
+  y: 0,
+  speed: 5,
+  angle: 0,
+  direction: Dir.N,
+
+  bobbingAmplitude: 0.2,
+  bobbingFrequency: 0.04,
+  bobbingPhase: 0,
+
+  GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
+  states: {
+    follow: 0,
+    static: 1,
+    keys: 2,
+  },
+
+  spritemap: null,
+  spriteCol: 0,
+  spriteRow: 0,
+
+  init: function() {
+    this.spritemap = Assets.spritemaps[0];
+  },
+
+  update: function() {
+
+    if (BaseMap.cursorInBounds()) this.GFUEL = this.states.follow;
+    else this.GFUEL = this.states.static;
+
+    switch(this.GFUEL) {
+      case this.states.follow: // Follow cursor
+        const dx = GI.cursorX - this.x;
+        const dy = GI.cursorY - this.y;
+
+        const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
+        const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
+
+        this.x += (dx - GI.spriteSize / 4) / distance * cappedSpeed;
+        this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
+
+        this.angle = calcAngle2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4);
+
+        this.adjustBob();
+        break;
+      case this.states.static: // Just idle
+        this.adjustBob();
+        break;
+      case this.states.keys: // Key controls
+        break;
+    }
+
+    this.direction = toDirection(this.angle);
+    this.updateSprite();
+  },
+
+  updateSprite: function() {
+    switch (this.direction) {
+      case Dir.NW: this.spriteCol = 2; break;
+      case Dir.NE: this.spriteCol = 1; break;
+      case Dir.SE: this.spriteCol = 0; break;
+      case Dir.SW: this.spriteCol = 3; break;
+    }
+    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 2;
+  },
+
+  draw: function() {
+    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    this.spritemap.drawTile(Screen.ghost, this.spriteCol, this.spriteRow, this.x, this.y);
+  },
+
+  adjustBob: function() { // manages bobbing height
+    this.y += this.bobbingAmplitude * Math.sin(this.bobbingPhase);
+    this.bobbingPhase += this.bobbingFrequency;
+  }
+}
+
+class HardwareBug {
+  //
+};
+
+
+///////////
+// MAP
+///////////
+
+const BaseMap = {
+  map: [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ],
+
+  tilePos: function(x, y) {
+    return [Math.floor(x / GI.unit), Math.floor(y / GI.unit)];
+  },
+
+  tileCenter: function(x, y) {
+    const [tileX, tileY] = this.tilePos(x, y);
+    return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
+  },
+
+  inBounds: function(x, y) {
+    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight)
+  },
+
+  cursorInBounds: function() {
+    return this.inBounds(GI.cursorX, GI.cursorY);
+  }
+}
+
+const HardwareLayer = {
+  curr: 0,
+
+  init: function() {
+    //
+  },
+
+  drawLevel: function() {
+    for (let y = 0; y < GI.height; ++y) {
+      for (let x = 0; x < GI.width; ++x) {
+        
+      }
+    }
+  },
+
+  advanceLevel: function() {
+    this.curr++
+  }
+}
+
+
 ///////////
 // WHERE IT ALL STARTS
 ///////////
 window.onload = () => {
+
+  // Initialization
   GI.init();
   Storage.init();
   Screen.init();
   Assets.init();
-  // START THE GAME (might delay this later)
   Animator.init();
+
+  document.getElementsByTagName("body")[0].addEventListener("mousemove", (e) => {
+    GI.cursorX = e.clientX - GI.canvasX;
+    GI.cursorY = e.clientY - GI.canvasY;
+  }, false);
+
+  Ghost.init();
+
+  // Start game loop
+  Animator.start();
+}
+
+function updateAll() {
+  Ghost.update();
+}
+
+function drawAll() {
+  Ghost.draw();
 }

@@ -1,2 +1,3 @@
 *.aseprite
 .vscode
+.DS_Store
