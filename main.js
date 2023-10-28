@@ -247,17 +247,17 @@ function toDirection(angle) {
 }
 
 function toCardinal(angle) {
-  return Math.floor(((angle) % 360) / 90);
+  return Math.floor(((angle + 45) % 360) / 90);
 }
 
-const Dir = {
+const Direction = {
   NW: 0,
   NE: 1,
   SE: 2,
   SW: 3,
 
-  N: 0,
-  W: 1,
+  W: 0,
+  N: 1,
   E: 2,
   S: 3,
 };
@@ -272,7 +272,7 @@ const Ghost = {
   y: 0,
   speed: 5,
   angle: 0,
-  direction: Dir.NE,
+  direction: Direction.NE,
 
   bobbingAmplitude: 0.2,
   bobbingFrequency: 0.04,
@@ -326,10 +326,10 @@ const Ghost = {
 
   updateSprite: function() {
     switch (this.direction) {
-      case Dir.NW: this.spriteCol = 2; break;
-      case Dir.NE: this.spriteCol = 1; break;
-      case Dir.SE: this.spriteCol = 0; break;
-      case Dir.SW: this.spriteCol = 3; break;
+      case Direction.NW: this.spriteCol = 2; break;
+      case Direction.NE: this.spriteCol = 1; break;
+      case Direction.SE: this.spriteCol = 0; break;
+      case Direction.SW: this.spriteCol = 3; break;
     }
     if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 2;
   },
@@ -350,7 +350,7 @@ class WireBug {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.speed = 10;
     this.angle = 0;
-    this.direction = Dir.N;
+    this.direction = Direction.N;
     this.runDist = 0;
 
     this.spritemap = Assets.spritemaps[1];
@@ -367,8 +367,6 @@ class WireBug {
       this.angle = reverseAngle(calcAngle2(Ghost.x - this.x, Ghost.y - this.y));
       this.direction = toCardinal(this.angle);
       const cappedSpeed = Math.min(this.speed, this.runDist / Animator.fps);
-
-      console.log(this.direction);
     }
 
     this.updateSprite();
@@ -376,12 +374,12 @@ class WireBug {
 
   updateSprite() {
     switch (this.direction) {
-      case Dir.N: this.spriteCol = 2; break;
-      case Dir.W: this.spriteCol = 1; break;
-      case Dir.S: this.spriteCol = 0; break;
-      case Dir.E: this.spriteCol = 3; break;
+      case Direction.N: this.spriteCol = 2; break;
+      case Direction.W: this.spriteCol = 1; break;
+      case Direction.S: this.spriteCol = 0; break;
+      case Direction.E: this.spriteCol = 3; break;
     }
-    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
+    if (this.runDist > 0 && Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
   }
 
   draw() {
