@@ -24,6 +24,7 @@ const GI = {
 
   // level
   level: 0,
+  nextLevel: false,
 
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
@@ -370,7 +371,7 @@ const Ghost = {
   }
 }
 
-class WireSpot {
+class WireSlot {
   constructor(tileX, tileY) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.activated = false;
@@ -383,7 +384,7 @@ class WireSpot {
 }
 
 class WireBug {
-  constructor(tileX, tileY, wireSpot) {
+  constructor(tileX, tileY, wireSlot) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.speed = 3;
     this.angle = 0;
@@ -391,7 +392,7 @@ class WireBug {
     this.dx = 0;
     this.dy = 0;
 
-    this.wireSpot = wireSpot;
+    this.wireSlot = wireSlot;
 
     this.state = 0;
     this.states = {
@@ -409,9 +410,9 @@ class WireBug {
   update() {
 
     // the following is code
-    if (this.wirespot && dist(this.wireSpot.x, this.wireSpot.y, this.x, this.y) < this.wireSpot) {
-      this.targetX = this.wireSpot.x;
-      this.targetY = this.wireSpot.y;
+    if (this.wireSlot && dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot) {
+      this.targetX = this.wireSlot.x;
+      this.targetY = this.wireSlot.y;
       this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
       this.state = this.states.wiring;
     } else if (this.state != this.states.running && dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
@@ -463,10 +464,11 @@ class WireBug {
 };
 
 const BugManager = {
-  bugs: [],
+  wirebugs: [],
 
   init: function() {
-    this.bugs.push(new WireBug(5, 5));
+    
+    this.wirebugs.push(new WireBug(5, 5));
   },
 
   updateBugs: function() {
@@ -508,17 +510,6 @@ class LetterBlock {
 ///////////
 
 const BaseMap = {
-  map: [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  ],
 
   getTilePos: function(x, y) {
     return [Math.floor(x / GI.unit), Math.floor(y / GI.unit)];
@@ -636,7 +627,17 @@ window.onload = () => {
   Animator.start();
 }
 
+function goNextLevel() {
+  GI.level++;
+  Screen.clear();
+}
+
 function updateAll() {
+  if (GI.nextLevel) {
+    GI.nextLevel = false;
+    goNextLevel();
+  }
+
   switch(GI.level) {
     case 0: HardwareLayer.update(); break;
     case 1: CLILayer.update(); break;
