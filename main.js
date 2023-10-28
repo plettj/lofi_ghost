@@ -120,7 +120,7 @@ class Spritemap {
 
   drawTile(context, x, y, destX, destY) {
     const [xT, yT] = this.getTileCoordinates(x, y);
-    context.drawImage(this.image, xT, yT, GI.spriteSize, GI.spriteSize, destX, destY, GI.unit, GI.unit);
+    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX, destY, GI.unit, GI.unit); // clipping fix hack
   }
 }
 
