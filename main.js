@@ -59,7 +59,7 @@ const Storage = {
 
 
 ///////////
-// GAME LOOP
+// RENDERING
 ///////////
 const Screen = {
   layers: 8, // Total layers on our screen
@@ -80,6 +80,7 @@ const Screen = {
       canvas.id = "Canvas" + i;
       canvas.width = GI.unit * GI.width;
       canvas.height = GI.unit * GI.height;
+      canvas.style.setProperty("background-color", "transparent");
       document.body.insertBefore(canvas, belowCanvases);
 
       let context = canvas.getContext("2d");
@@ -120,7 +121,7 @@ class Spritemap {
 
   drawTile(context, x, y, destX, destY) {
     const [xT, yT] = this.getTileCoordinates(x, y);
-    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX, destY, GI.unit, GI.unit); // clipping fix hack
+    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
   }
 }
 
@@ -237,15 +238,28 @@ function calcAngle2(dx, dy) {
   return Math.atan2(dy, dx) / Math.PI * 180 + 180;
 }
 
+function reverseAngle(angle) {
+  return (angle + 180) % 360;
+}
+
 function toDirection(angle) {
   return Math.floor(angle / 90);
 }
 
+function toCardinal(angle) {
+  return Math.floor(((angle) % 360) / 90);
+}
+
 const Dir = {
   NW: 0,
-  SW: 1,
+  NE: 1,
   SE: 2,
-  NE: 3,
+  SW: 3,
+
+  N: 0,
+  W: 1,
+  E: 2,
+  S: 3,
 };
 
 
@@ -254,11 +268,11 @@ const Dir = {
 ///////////
 
 const Ghost = {
-  x: 0,
+  x: 0, // center of sprite
   y: 0,
   speed: 5,
   angle: 0,
-  direction: Dir.N,
+  direction: Dir.NE,
 
   bobbingAmplitude: 0.2,
   bobbingFrequency: 0.04,
@@ -266,8 +280,8 @@ const Ghost = {
 
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
   states: {
-    follow: 0,
-    static: 1,
+    idle: 0,
+    follow: 1,
     keys: 2,
   },
 
@@ -282,9 +296,12 @@ const Ghost = {
   update: function() {
 
     if (BaseMap.cursorInBounds()) this.GFUEL = this.states.follow;
-    else this.GFUEL = this.states.static;
+    else this.GFUEL = this.states.idle;
 
     switch(this.GFUEL) {
+      case this.states.idle: // Just idle
+        this.adjustBob();
+        break;
       case this.states.follow: // Follow cursor
         const dx = GI.cursorX - this.x;
         const dy = GI.cursorY - this.y;
@@ -292,14 +309,11 @@ const Ghost = {
         const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
         const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
 
-        this.x += (dx - GI.spriteSize / 4) / distance * cappedSpeed;
-        this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
+        this.x += dx / distance * cappedSpeed;
+        this.y += (dy + GI.unit) / distance * cappedSpeed;
 
-        this.angle = calcAngle2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4);
+        this.angle = calcAngle2(dx, dy);
 
-        this.adjustBob();
-        break;
-      case this.states.static: // Just idle
         this.adjustBob();
         break;
       case this.states.keys: // Key controls
@@ -321,7 +335,7 @@ const Ghost = {
   },
 
   draw: function() {
-    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight); // manages clearing its own layer
     this.spritemap.drawTile(Screen.ghost, this.spriteCol, this.spriteRow, this.x, this.y);
   },
 
@@ -331,9 +345,70 @@ const Ghost = {
   }
 }
 
-class HardwareBug {
-  //
+class WireBug {
+  constructor(tileX, tileY) {
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.speed = 10;
+    this.angle = 0;
+    this.direction = Dir.N;
+    this.runDist = 0;
+
+    this.spritemap = Assets.spritemaps[1];
+    this.spriteCol = 0;
+    this.spriteRow = 0;
+  }
+
+  update() {
+    if (dist(Ghost.x, Ghost.y, this.x, this.y) < 100) {
+      this.runDist = GI.unit * 3;
+    }
+
+    if (this.runDist != 0) {
+      this.angle = reverseAngle(calcAngle2(Ghost.x - this.x, Ghost.y - this.y));
+      this.direction = toCardinal(this.angle);
+      const cappedSpeed = Math.min(this.speed, this.runDist / Animator.fps);
+
+      console.log(this.direction);
+    }
+
+    this.updateSprite();
+  }
+
+  updateSprite() {
+    switch (this.direction) {
+      case Dir.N: this.spriteCol = 2; break;
+      case Dir.W: this.spriteCol = 1; break;
+      case Dir.S: this.spriteCol = 0; break;
+      case Dir.E: this.spriteCol = 3; break;
+    }
+    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
+  }
+
+  draw() {
+    this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y);
+  }
 };
+
+const BugManager = {
+  bugs: [],
+
+  init: function() {
+    this.bugs.push(new WireBug(5, 5));
+  },
+
+  updateBugs: function() {
+    for (let i = 0; i < this.bugs.length; ++i) {
+     this.bugs[i].update();
+    }
+  },
+
+  drawBugs: function() {
+    Screen.bugs.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    for (let i = 0; i < this.bugs.length; ++i) {
+      this.bugs[i].draw();
+    }
+  }
+}
 
 
 ///////////
@@ -353,22 +428,29 @@ const BaseMap = {
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   ],
 
-  tilePos: function(x, y) {
+  getTilePos: function(x, y) {
     return [Math.floor(x / GI.unit), Math.floor(y / GI.unit)];
   },
 
-  tileCenter: function(x, y) {
-    const [tileX, tileY] = this.tilePos(x, y);
+  getTileCenter: function(tileX, tileY) {
     return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
   },
 
+  getTileCenterCoords: function(x, y) {
+    return this.getTileCenter(this.getTilePos(x, y))
+  },
+
   inBounds: function(x, y) {
-    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight)
+    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight);
   },
 
   cursorInBounds: function() {
     return this.inBounds(GI.cursorX, GI.cursorY);
-  }
+  },
+
+  spriteInBounds: function(x, y) {
+    return 
+  },
 }
 
 const HardwareLayer = {
@@ -410,6 +492,11 @@ window.onload = () => {
   }, false);
 
   Ghost.init();
+  BugManager.init();
+
+  // temp background
+  Screen.void.fillStyle = "white";
+  Screen.void.fillRect(0, 0, GI.canvasWidth, GI.canvasHeight);
 
   // Start game loop
   Animator.start();
@@ -417,8 +504,10 @@ window.onload = () => {
 
 function updateAll() {
   Ghost.update();
+  BugManager.updateBugs();
 }
 
 function drawAll() {
   Ghost.draw();
+  BugManager.drawBugs();
 }
