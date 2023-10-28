@@ -1,16 +1,22 @@
 ///////////
-// GLOBAL INFO, INITIALIZATION, & EVENTS
-///////////
-
-///////////
 // GLOBAL INFORMATION
 ///////////
-let GI = {
+const GI = {
   unit: 1, // The game unit, in computer pixels (dynamically calculated)
-  width: 32, // Game area width in Units
-  height: 18,
+  width: 16, // Game area width in Units
+  height: 9,
   res: 8, // Art pixels / unit
   pixel: 1, // Computer pixels / Art pixel
+
+  // canvas (x,y), width, height
+  canvasX: 0,
+  canvasY: 0,
+  canvasWidth: 0,
+  canvasHeight: 0,
+
+  // cursor (x, y)
+  cursorX: 0, 
+  cursorY: 0,
 
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
@@ -22,7 +28,7 @@ let GI = {
   }
 }
 
-let Storage = {
+const Storage = {
   storedName: "UWGameJam_SavedData",
   splashScreen: false, // Whether to display the splash screen on game load
   currentData: { // All save-able game data goes here!
@@ -47,13 +53,22 @@ let Storage = {
   }
 }
 
+
 ///////////
-// INITIALIZATION
+// GAME LOOP
 ///////////
-let Screen = {
-  layers: 2, // Total layers on our screen
+const Screen = {
+  layers: 8, // Total layers on our screen
   contexts: [],
-  
+
+  // layer aliases
+  void: null,
+  background: null,
+  objects: null,
+  bugs: null,
+  ghost: null,
+  screen: null,
+
   init: function () {
     let belowCanvases = document.querySelector(".belowCanvases");
     for (let i = 0; i < this.layers; i++) {
@@ -67,10 +82,26 @@ let Screen = {
       context.imageSmoothingEnabled = false;
       this.contexts.push(context);
     }
+
+    this.void = this.contexts[0];
+    this.backgound = this.contexts[1]; // floor and solid walls
+    // underground??
+    this.objects = this.contexts[5];
+    this.bugs = this.contexts[6];
+    this.ghost = this.contexts[7];
+
+    const canvas = document.getElementById("Canvas0");
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      GI.canvasX = rect.left;
+      GI.canvasY = rect.top;
+      GI.canvasWidth = rect.width;
+      GI.canvasHeight = rect.height;
+    }
   }
 }
 
-let Assets = {
+const Assets = {
   names: [], // List with each tileset's name
   sources: [],
 
@@ -83,7 +114,7 @@ let Assets = {
   }
 }
 
-let Animator = {
+const Animator = {
   frame: 0,
   paused: false,
   fps: 60,
@@ -97,9 +128,12 @@ let Animator = {
     this.fpsInterval = 1000 / this.fps;
     this.then = Date.now();
     this.startTime = this.then;
+  },
 
+  start: function () {
     this.animate();
   },
+
   animate: () => {
     requestAnimationFrame(() => { Animator.animate(); });
     Animator.now = Date.now();
@@ -115,9 +149,11 @@ let Animator = {
   }
 }
 
+
 ///////////
 // EVENTS
 ///////////
+
 function keyPressed(code, pressed) {
   if (!Animator.paused || !pressed) {
     if ((code == 37 || code == 65)) return; // Left
@@ -154,14 +190,103 @@ document.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
+
+///////////
+// UTIL
+///////////
+
+function between(x, a, b) {
+  return (x < Math.max(a, b)) && (x > Math.min(a, b));
+}
+
+function clamp(x, a, b) {
+  return Math.min(Math.max(x, Math.min(a, b)), Math.max(a, b));
+}
+
+///////////
+// WORLD
+///////////
+
+const Ghost = {
+  x: 0,
+  y: 0,
+  GFUEL: 0,
+
+  init: function() {
+    //
+  }
+}
+
+///////////
+// MAP
+///////////
+
+const CoreMap = {
+  map: [
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  ],
+
+  canvasPos: function(x, y) {
+    return [x - GI.canvasX, y - GI.canvasY];
+  },
+
+  tilePos: function(x, y) {
+    const [cx, cy] = this.canvasPos(x, y);
+    return [Math.floor(cx / GI.unit), Math.floor(cy / GI.unit)];
+  },
+
+  cursorInBounds: function() {
+    return between(GI.cursorX, GI.canvasX, GI.canvasX + GI.canvasWidth) && between(GI.cursorY, GI.canvasY, GI.canvasY + GI.canvasHeight)
+  }
+}
+
+const HardwareLayer = {
+  curr: 0,
+
+  init: function() {
+    //
+  },
+
+  drawLevel: function() {
+    for (let y = 0; y < GI.height; ++y) {
+      for (let x = 0; x < GI.width; ++x) {
+        
+      }
+    }
+  },
+
+  advanceLevel: function() {
+    this.curr++
+  }
+}
+
+
 ///////////
 // WHERE IT ALL STARTS
 ///////////
 window.onload = () => {
+
+  // Initialization
   GI.init();
   Storage.init();
   Screen.init();
   Assets.init();
-  // START THE GAME (might delay this later)
   Animator.init();
+
+  document.getElementsByTagName("body")[0].addEventListener("mousemove", (e) => {
+    GI.cursorX = e.clientX;
+    GI.cursorY = e.clientY;
+  }, false);
+
+  // Start game loop
+  Animator.start();
 }
