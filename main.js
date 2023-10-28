@@ -109,9 +109,13 @@ const Screen = {
     }
   },
 
-  clear: function() {
+  clear: function(context) {
+    context.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+  },
+
+  clearAll: function() {
     for (let i = 0; i < this.layers; ++i) {
-      this.contexts[i].clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+      this.clear(this.contexts[i]);
     }
   }
 }
@@ -134,9 +138,14 @@ class Spritemap {
     context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
   }
 
-  drawTileAtAngle(context, x, y, destX, destY, angle) {
+  drawRotatedTile(context, x, y, destX, destY, angle) {
     const [xT, yT] = this.getTileCoordinates(x, y);
+    context.save();
+    context.translate(destX, destY);
+    context.rotate(angle / 180 * Math.PI);
+    context.translate(-xT, -yT);
     context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
+    context.restore();
   }
 }
 
@@ -361,7 +370,6 @@ const Ghost = {
   },
 
   draw: function() {
-    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight); // manages clearing its own layer
     this.spritemap.drawTile(Screen.ghost, this.spriteCol, this.spriteRow, this.x, this.y);
   },
 
@@ -376,6 +384,10 @@ class WireSlot {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.activated = false;
     this.range = GI.unit * 2;
+  }
+
+  update() {
+    //
   }
 
   draw() {
@@ -396,7 +408,7 @@ class WireBug {
 
     this.state = 0;
     this.states = {
-      idle: 0,
+      wander: 0,
       running: 1,
       wiring: 2,
       wired: 3,
@@ -409,43 +421,29 @@ class WireBug {
 
   update() {
 
-    // the following is code
-    if (this.wireSlot && dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot) {
+    if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot) { // wiring takes priority
+      this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
       this.targetX = this.wireSlot.x;
       this.targetY = this.wireSlot.y;
-      this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
       this.state = this.states.wiring;
-    } else if (this.state != this.states.running && dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
-      this.angle = calcAngle2(Ghost.x - this.x, Ghost.y - this.y);
-      this.targetX = clamp(this.x + this.runDist * dcos(this.angle), GI.unit, GI.canvasWidth - GI.unit);
-      this.targetY = clamp(this.y + this.runDist * dsin(this.angle), GI.unit, GI.canvasHeight - GI.unit);
-      this.state = this.states.running;
-    } else if (this.x == this.targetX && this.y == this.targetY) {
-      this.state = this.states.idle;
     }
 
-    const distance = dist(this.x, this.y, this.targetX, this.targetY);
     switch (this.state) {
-      case this.states.idle:
+      case this.states.wander:
+        if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+          this.angle = calcAngle2(Ghost.x - this.x, Ghost.y - this.y);
+          this.targetX = this.x + this.runDist * dcos(this.angle);
+          this.targetY = this.y + this.runDist * dsin(this.angle);
+          this.state = this.states.running;
+        } else {
+          this.wander();
+        }
         break;
       case this.states.running:
-        if (distance > this.speed) {
-          this.x += dcos(this.angle) * this.speed;
-          this.y += dsin(this.angle) * this.speed;
-        } else {
-          this.x = this.targetX;
-          this.y = this.targetY;
-        }
+        this.moveToTarget(this.states.wander);
         break;
       case this.states.wiring:
-        if (distance > this.speed) {
-          this.x += dcos(this.angle) * this.speed;
-          this.y += dsin(this.angle) * this.speed;
-        } else {
-          this.x = this.targetX;
-          this.y = this.targetY;
-          this.state = this.states.wired;
-        }
+        this.moveToTarget(this.states.wired);
         break;
       case this.states.wired:
         break;
@@ -454,11 +452,27 @@ class WireBug {
     this.updateSprite();
   }
 
+  wander() {
+    //
+  }
+
+  moveToTarget(nextState) {
+    if (dist(this.x, this.y, this.targetX, this.targetY) > this.speed) {
+      this.x += dcos(this.angle) * this.speed;
+      this.y += dsin(this.angle) * this.speed;
+    } else {
+      this.x = this.targetX;
+      this.y = this.targetY;
+      this.state = nextState;
+    }
+  }
+
   updateSprite() {
     if (this.runDist > 0 && Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
   }
 
   draw() {
+    //this.spritemap.drawRotatedTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
     this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y);
   }
 };
@@ -467,9 +481,6 @@ const BugManager = {
   bugs: [],
 
   init: function() {
-    const wireSlot1 = new WireSlot(8, 8);
-    wireSlot1.draw();
-    this.bugs.push(new WireBug(5, 5, wireSlot1));
   },
 
   updateBugs: function() {
@@ -479,7 +490,7 @@ const BugManager = {
   },
 
   drawBugs: function() {
-    Screen.bugs.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    Screen.clear(Screen.bugs);
     for (let i = 0; i < this.bugs.length; ++i) {
       this.bugs[i].draw();
     }
@@ -524,59 +535,44 @@ const BaseMap = {
     return this.getTileCenter(this.getTilePos(x, y))
   },
 
-  inBounds: function(x, y) {
-    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight);
-  },
-
   cursorInBounds: function() {
-    return this.inBounds(GI.cursorX, GI.cursorY);
+    return between(GI.cursorX, 0, GI.canvasWidth) && between(GI.cursorY, 0, GI.canvasHeight);
   },
 
-  // Sprite bounds helpers
-  collisionWest: function(x) {
-    return x < 0;
-  },
-
-  collisionNorth: function(y) {
-    return y < 0;
-  },
-
-  collisionEast: function(x) {
-    return x < GI.canvasWidth;
-  },
-
-  collisionSouth: function(y) {
-    return y < GI.canvasHeight;
-  },
-
-  collisionV: function(y) {
-    return this.collisionNorth(y - GI.unit / 2) || this.collisionSouth(y + GI.unit / 2);
-  },
-
-  collisionH: function(x) {
-    return this.collisionWest(x - GI.unit / 2) || this.collisionEast(x + GI.unit / 2);
-  },
-
-  spriteInBounds: function(x, y) {
-    return !this.collisionV(y) && !this.collisionH(x);
+  fixSpriteInBounds: function(sprite) {
+    if (sprite.x - GI.unit / 2 < 0) sprite.x = GI.unit / 2;
+    if (sprite.x + GI.unit / 2 > GI.canvasWidth) sprite.x = GI.canvasWidth - GI.unit / 2;
+    if (sprite.y - GI.unit / 2 < 0) sprite.y = GI.unit / 2;
+    if (sprite.y + GI.unit / 2 > GI.canvasHeight) sprite.y = GI.canvasHeight - GI.unit / 2;
   },
 }
 
 const HardwareLayer = {
+  sprites: [],
+
   init: function() {
     Ghost.init();
-    BugManager.init();
+    this.sprites.push(Ghost);
+
+    const wireSlot1 = new WireSlot(8, 8);
+    const wireBug1 = new WireBug(5, 5, wireSlot1);
+    const wireSlot2 = new WireSlot(9, 7);
+    const wireBug2 = new WireBug(6, 6, wireSlot2);
+    this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
   },
 
   update: function() {
-    Ghost.update();
-    BugManager.updateBugs();
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].update();
+      BaseMap.fixSpriteInBounds(this.sprites[i]);
+    }
   },
 
   draw: function() {
-    // draw bg
-    Ghost.draw();
-    BugManager.drawBugs();
+    Screen.clear(Screen.bugs);
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].draw();
+    }
   },
 }
 
@@ -647,6 +643,7 @@ function updateAll() {
 }
 
 function drawAll() {
+  Screen.clear(Screen.ghost);
   switch(GI.level) {
     case 0: HardwareLayer.draw(); break;
     case 1: CLILayer.draw(); break;
