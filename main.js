@@ -102,7 +102,7 @@ const Screen = {
       GI.canvasWidth = rect.width;
       GI.canvasHeight = rect.height;
     }
-  }
+  },
 }
 
 class Spritemap {
@@ -115,7 +115,7 @@ class Spritemap {
   }
   
   getTileCoordinates(index) {
-    return [Math.floor(index / this.col) * GI.spriteSize, index % this.col * GI.spriteSize];
+    return [index % this.col * GI.spriteSize, Math.floor(index / this.col) * GI.spriteSize];
   }
 
   drawTile(context, index, destX, destY) {
@@ -229,9 +229,20 @@ function clamp(x, a, b) {
   return Math.min(Math.max(x, Math.min(a, b)), Math.max(a, b));
 }
 
-function dist(x1, y1, x2, y2) {
-  return Math.sqrt(Math.pow(Math.abs(x1 - x2), 2) + Math.pow(Math.abs(y1 - y2), 2));
+function dist(x1, y1, x2, y2  ) {
+  return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
 }
+
+const Dir = {
+  W: 0,
+  NW: 1,
+  N: 2,
+  NE: 3,
+  E: 4,
+  SE: 5,
+  S: 6,
+  SW: 7,
+};
 
 
 ///////////
@@ -241,7 +252,13 @@ function dist(x1, y1, x2, y2) {
 const Ghost = {
   x: 0,
   y: 0,
-  speed: 0,
+  speed: 5,
+  angle: 0,
+  direction: Dir.N,
+
+  bobbingAmplitude: 0.2,
+  bobbingFrequency: 0.04,
+  bobbingPhase: 0,
 
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
   states: { // GFUEL states
@@ -251,41 +268,71 @@ const Ghost = {
   },
 
   spritemap: null,
+  spriteIndex: 0,
 
   init: function() {
-    this.speed = 5;
     this.spritemap = Assets.spritemaps[0];
   },
 
   update: function() {
     const [tileX, tileY] = BaseMap.tilePos(this.x, this.y);
-    //const tileState = BaseMap.tileState(tileX, tileY);
+    const tileState = BaseMap.tileState(this.x, this.y);
 
     if (!BaseMap.cursorInBounds()) this.GFUEL = this.states.static;
+    else this.GFUEL = this.states.follow;
 
     switch(this.GFUEL) {
       case this.states.follow: // Follow cursor
         const dx = GI.cursorX - this.x;
         const dy = GI.cursorY - this.y;
 
-        this.x = dx;
-        this.y = dy;
+        const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
+        const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
+
+        this.x += (dx - GI.spriteSize / 4) / distance * cappedSpeed;
+        this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
+
+        this.angle = Math.atan2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4) / Math.PI * 180 + 180;
+        console.log(this.angle)
+
         this.adjustBob();
         break;
-      case this.states.static: // No moving
+      case this.states.static: // Just idle
         this.adjustBob();
         break;
       case this.states.keys: // Key controls
         break;
     }
+
+    this.setDirection();
+    this.updateSprite();
+  },
+
+  setDirection: function() {
+    this.direction = Math.floor(this.angle / 45);
+  },
+
+  updateSprite: function() {
+    switch (this.direction) {
+      case Dir.N: this.spriteIndex = 0; break;
+      case Dir.NE: this.spriteIndex = 1; break;
+      case Dir.E: this.spriteIndex = 4; break;
+      case Dir.SE: this.spriteIndex = 5; break;
+      case Dir.S: this.spriteIndex = 2; break;
+      case Dir.SW: this.spriteIndex = 7; break;
+      case Dir.W: this.spriteIndex = 6; break;
+      case Dir.NW: this.spriteIndex = 3; break;
+    }
   },
 
   draw: function() {
-    this.spritemap.drawTile(Screen.ghost, 0, 0, 0);
+    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+    this.spritemap.drawTile(Screen.ghost, this.spriteIndex, this.x, this.y);
   },
 
   adjustBob: function() { // controls bobbing height
-    //
+    this.y += this.bobbingAmplitude * Math.sin(this.bobbingPhase);
+    this.bobbingPhase += this.bobbingFrequency;
   }
 }
 
@@ -322,13 +369,8 @@ const BaseMap = {
     [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
   ],
 
-  canvasPos: function(x, y) {
-    return [x - GI.canvasX, y - GI.canvasY];
-  },
-
   tilePos: function(x, y) {
-    const [cx, cy] = this.canvasPos(x, y);
-    return [Math.floor(cx / GI.unit), Math.floor(cy / GI.unit)];
+    return [Math.floor(x / GI.unit), Math.floor(y / GI.unit)];
   },
 
   tileCenter: function(x, y) {
@@ -337,6 +379,7 @@ const BaseMap = {
   },
 
   tileState: function(x, y) {
+    if (!BaseMap.cursorInBounds()) return [[-1, -1, -1], [-1, -1, -1], [-1, -1, -1]];
     const [tileX, tileY] = this.tilePos(x, y);
     return [
       this.mapPadded[tileY    ].slice(tileX, tileX + 3),
@@ -345,7 +388,7 @@ const BaseMap = {
   },
 
   cursorInBounds: function() {
-    return between(GI.cursorX, GI.canvasX, GI.canvasX + GI.canvasWidth) && between(GI.cursorY, GI.canvasY, GI.canvasY + GI.canvasHeight)
+    return between(GI.cursorX, 0, GI.canvasWidth) && between(GI.cursorY, 0, GI.canvasHeight)
   }
 }
 
@@ -383,12 +426,8 @@ window.onload = () => {
   Animator.init();
 
   document.getElementsByTagName("body")[0].addEventListener("mousemove", (e) => {
-    GI.cursorX = e.clientX;
-    GI.cursorY = e.clientY;
-  }, false);
-
-  document.getElementsByTagName("body")[0].addEventListener("mousedown", (e) => {
-    console.log(BaseMap.tileState(e.clientX, e.clientY));
+    GI.cursorX = e.clientX - GI.canvasX;
+    GI.cursorY = e.clientY - GI.canvasY;
   }, false);
 
   Ghost.init();
