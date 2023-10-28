@@ -114,13 +114,13 @@ class Spritemap {
     this.row = Math.floor(this.height / GI.spriteSize);
   }
   
-  getTileCoordinates(index) {
-    return [index % this.col * GI.spriteSize, Math.floor(index / this.col) * GI.spriteSize];
+  getTileCoordinates(x, y) {
+    return [x * GI.spriteSize, y * GI.spriteSize];
   }
 
-  drawTile(context, index, destX, destY) {
-    const [x, y] = this.getTileCoordinates(index);
-    context.drawImage(this.image, x, y, GI.spriteSize, GI.spriteSize, destX, destY, GI.unit, GI.unit);
+  drawTile(context, x, y, destX, destY) {
+    const [xT, yT] = this.getTileCoordinates(x, y);
+    context.drawImage(this.image, xT, yT, GI.spriteSize, GI.spriteSize, destX, destY, GI.unit, GI.unit);
   }
 }
 
@@ -233,6 +233,10 @@ function dist(x1, y1, x2, y2  ) {
   return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
 }
 
+function toDirection(angle) {
+  return Math.floor(angle / 45);
+}
+
 const Dir = {
   W: 0,
   NW: 1,
@@ -268,7 +272,8 @@ const Ghost = {
   },
 
   spritemap: null,
-  spriteIndex: 0,
+  spriteCol: 0,
+  spriteRow: 0,
 
   init: function() {
     this.spritemap = Assets.spritemaps[0];
@@ -303,30 +308,26 @@ const Ghost = {
         break;
     }
 
-    this.setDirection();
+    this.direction = toDirection(this.angle);
     this.updateSprite();
-  },
-
-  setDirection: function() {
-    this.direction = Math.floor(this.angle / 45);
   },
 
   updateSprite: function() {
     switch (this.direction) {
-      case Dir.N: this.spriteIndex = 0; break;
-      case Dir.NE: this.spriteIndex = 1; break;
-      case Dir.E: this.spriteIndex = 4; break;
-      case Dir.SE: this.spriteIndex = 5; break;
-      case Dir.S: this.spriteIndex = 2; break;
-      case Dir.SW: this.spriteIndex = 7; break;
-      case Dir.W: this.spriteIndex = 6; break;
-      case Dir.NW: this.spriteIndex = 3; break;
+      case Dir.N: [this.spriteRow, this.spriteCol] = [0, 0]; break;
+      case Dir.NE: [this.spriteRow, this.spriteCol] = [1, 0]; break;
+      case Dir.E: [this.spriteRow, this.spriteCol] = [0, 1]; break;
+      case Dir.SE: [this.spriteRow, this.spriteCol] = [1, 1]; break;
+      case Dir.S: [this.spriteRow, this.spriteCol] = [3, 0]; break;
+      case Dir.SW: [this.spriteRow, this.spriteCol] = [3, 1]; break;
+      case Dir.W: [this.spriteRow, this.spriteCol] = [2, 1]; break;
+      case Dir.NW: [this.spriteRow, this.spriteCol] = [2, 0]; break;
     }
   },
 
   draw: function() {
     Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
-    this.spritemap.drawTile(Screen.ghost, this.spriteIndex, this.x, this.y);
+    this.spritemap.drawTile(Screen.ghost, this.spriteRow, this.spriteCol, this.x, this.y);
   },
 
   adjustBob: function() { // controls bobbing height
