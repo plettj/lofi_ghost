@@ -15,7 +15,7 @@ const GI = {
   canvasHeight: 0,
 
   // cursor (x, y)
-  cursorX: 0, 
+  cursorX: 0,
   cursorY: 0,
 
   init: function () {
@@ -203,6 +203,10 @@ function clamp(x, a, b) {
   return Math.min(Math.max(x, Math.min(a, b)), Math.max(a, b));
 }
 
+function dist(x1, y1, x2, y2) {
+  return Math.sqrt(Math.pow(Math.abs(x1 - x2), 2) + Math.pow(Math.abs(y1 - y2), 2));
+}
+
 ///////////
 // WORLD
 ///////////
@@ -210,9 +214,40 @@ function clamp(x, a, b) {
 const Ghost = {
   x: 0,
   y: 0,
-  GFUEL: 0,
+  speed: 0,
+  GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
+  states: { // GFUEL states
+    follow: 0,
+    static: 1,
+    keys: 2,
+  },
 
   init: function() {
+    console.log("Erm");
+  },
+
+  update: function() {
+    const [tileX, tileY] = Map.tilePos(this.x, this.y);
+    const tileState = Map.tileState(tileX, tileY);
+
+    switch(this.GFUEL) {
+      case this.states.follow: // Follow cursor
+
+        this.adjustBob();
+        break;
+      case this.states.static: // No moving
+        this.adjustBob();
+        break;
+      case this.states.keys: // Key controls
+        break;
+    }
+  },
+
+  adjustBob: function() { // controls bobbing height
+    //
+  },
+
+  draw: function() {
     //
   }
 }
@@ -221,7 +256,7 @@ const Ghost = {
 // MAP
 ///////////
 
-const CoreMap = {
+const Map = {
   map: [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -235,6 +270,21 @@ const CoreMap = {
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
   ],
 
+  mapPadded: [
+    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+    [-1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  1, -1],
+    [-1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, -1],
+    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+  ],
+
   canvasPos: function(x, y) {
     return [x - GI.canvasX, y - GI.canvasY];
   },
@@ -242,6 +292,19 @@ const CoreMap = {
   tilePos: function(x, y) {
     const [cx, cy] = this.canvasPos(x, y);
     return [Math.floor(cx / GI.unit), Math.floor(cy / GI.unit)];
+  },
+
+  tileCenter: function(x, y) {
+    const [tileX, tileY] = this.tilePos(x, y);
+    return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
+  },
+
+  tileState: function(x, y) {
+    const [tileX, tileY] = this.tilePos(x, y);
+    return [
+      this.mapPadded[tileY    ].slice(tileX, tileX + 3),
+      this.mapPadded[tileY + 1].slice(tileX, tileX + 3),
+      this.mapPadded[tileY + 2].slice(tileX, tileX + 3)];
   },
 
   cursorInBounds: function() {
@@ -285,6 +348,10 @@ window.onload = () => {
   document.getElementsByTagName("body")[0].addEventListener("mousemove", (e) => {
     GI.cursorX = e.clientX;
     GI.cursorY = e.clientY;
+  }, false);
+
+  document.getElementsByTagName("body")[0].addEventListener("mousedown", (e) => {
+    console.log(Map.tileState(e.clientX, e.clientY));
   }, false);
 
   // Start game loop
