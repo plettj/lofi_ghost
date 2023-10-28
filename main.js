@@ -293,7 +293,6 @@ const Ghost = {
         this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
 
         this.angle = Math.atan2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4) / Math.PI * 180 + 180;
-        console.log(this.angle)
 
         this.adjustBob();
         break;
