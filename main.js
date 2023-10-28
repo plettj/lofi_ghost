@@ -2,19 +2,23 @@
 // GLOBAL INFORMATION
 ///////////
 const GI = {
+  // units
   unit: 1, // The game unit, in computer pixels (dynamically calculated)
   width: 16, // Game area width in Units
   height: 9,
   res: 8, // Art pixels / unit
   pixel: 1, // Computer pixels / Art pixel
 
-  // canvas (x,y), width, height
+  // sprite maps
+  spriteSize: 80, // width == height
+
+  // canvas
   canvasX: 0,
   canvasY: 0,
   canvasWidth: 0,
   canvasHeight: 0,
 
-  // cursor (x, y)
+  // cursor
   cursorX: 0,
   cursorY: 0,
 
@@ -101,17 +105,37 @@ const Screen = {
   }
 }
 
+class Spritemap {
+  constructor(image) {
+    this.image = image;
+    this.width = image.width;
+    this.height = image.height;
+    this.col = Math.floor(this.width / GI.spriteSize);
+    this.row = Math.floor(this.height / GI.spriteSize);
+  }
+  
+  getTileCoordinates(index) {
+    return [Math.floor(index / this.col) * GI.spriteSize, index % this.col * GI.spriteSize];
+  }
+
+  drawTile(context, index, destX, destY) {
+    const [x, y] = this.getTileCoordinates(index);
+    context.drawImage(this.image, x, y, GI.spriteSize, GI.spriteSize, destX, destY, GI.unit, GI.unit);
+  }
+}
+
 const Assets = {
-  names: [], // List with each tileset's name
-  sources: [],
+  spritemapNames: ["ghost", "hardwarebug"],
+  spritemapsPath: "assets/spritemaps",
+  spritemaps: [],
 
   init: function () {
-    for (let i = 0; i < this.names.length; i++) {
+    for (let i = 0; i < this.spritemapNames.length; i++) {
       let image = new Image();
-      image.src = graphics + "/" + this.names[i];
-      this.sources.push(image);
+      image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
+      this.spritemaps.push(new Spritemap(image));
     }
-  }
+  },
 }
 
 const Animator = {
@@ -143,6 +167,8 @@ const Animator = {
       Animator.then = Animator.now - (Animator.elapsed % Animator.fpsInterval);
       
       if (!Animator.paused) { // GAME LOOP
+        updateAll();
+        drawAll();
         Animator.frame++;
       }
     }
@@ -207,6 +233,7 @@ function dist(x1, y1, x2, y2) {
   return Math.sqrt(Math.pow(Math.abs(x1 - x2), 2) + Math.pow(Math.abs(y1 - y2), 2));
 }
 
+
 ///////////
 // WORLD
 ///////////
@@ -215,6 +242,7 @@ const Ghost = {
   x: 0,
   y: 0,
   speed: 0,
+
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
   states: { // GFUEL states
     follow: 0,
@@ -222,17 +250,26 @@ const Ghost = {
     keys: 2,
   },
 
+  spritemap: null,
+
   init: function() {
-    console.log("Erm");
+    this.speed = 5;
+    this.spritemap = Assets.spritemaps[0];
   },
 
   update: function() {
-    const [tileX, tileY] = Map.tilePos(this.x, this.y);
-    const tileState = Map.tileState(tileX, tileY);
+    const [tileX, tileY] = BaseMap.tilePos(this.x, this.y);
+    //const tileState = BaseMap.tileState(tileX, tileY);
+
+    if (!BaseMap.cursorInBounds()) this.GFUEL = this.states.static;
 
     switch(this.GFUEL) {
       case this.states.follow: // Follow cursor
+        const dx = GI.cursorX - this.x;
+        const dy = GI.cursorY - this.y;
 
+        this.x = dx;
+        this.y = dy;
         this.adjustBob();
         break;
       case this.states.static: // No moving
@@ -243,11 +280,11 @@ const Ghost = {
     }
   },
 
-  adjustBob: function() { // controls bobbing height
-    //
+  draw: function() {
+    this.spritemap.drawTile(Screen.ghost, 0, 0, 0);
   },
 
-  draw: function() {
+  adjustBob: function() { // controls bobbing height
     //
   }
 }
@@ -256,7 +293,7 @@ const Ghost = {
 // MAP
 ///////////
 
-const Map = {
+const BaseMap = {
   map: [
     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
@@ -351,9 +388,19 @@ window.onload = () => {
   }, false);
 
   document.getElementsByTagName("body")[0].addEventListener("mousedown", (e) => {
-    console.log(Map.tileState(e.clientX, e.clientY));
+    console.log(BaseMap.tileState(e.clientX, e.clientY));
   }, false);
+
+  Ghost.init();
 
   // Start game loop
   Animator.start();
+}
+
+function updateAll() {
+  Ghost.update();
+}
+
+function drawAll() {
+  Ghost.draw();
 }
