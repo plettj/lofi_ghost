@@ -55,14 +55,15 @@ let Screen = {
   contexts: [],
   
   init: function () {
+    let belowCanvases = document.querySelector(".belowCanvases");
     for (let i = 0; i < this.layers; i++) {
       let canvas = document.createElement("CANVAS");
       canvas.id = "Canvas" + i;
       canvas.width = GI.unit * GI.width;
       canvas.height = GI.unit * GI.height;
-      document.body.insertBefore(canvas, document.querySelector(".belowCanvases"));
+      document.body.insertBefore(canvas, belowCanvases);
 
-      let context = canvas.getContext('2d');
+      let context = canvas.getContext("2d");
       context.imageSmoothingEnabled = false;
       this.contexts.push(context);
     }
@@ -149,7 +150,7 @@ document.addEventListener("mousedown", (event) => {
   return false;
 });
 
-document.addEventListener('contextmenu', (event) => {
+document.addEventListener("contextmenu", (event) => {
   event.preventDefault();
 });
 
@@ -161,7 +162,6 @@ window.onload = () => {
   Storage.init();
   Screen.init();
   Assets.init();
-  
   // START THE GAME (might delay this later)
   Animator.init();
 }
