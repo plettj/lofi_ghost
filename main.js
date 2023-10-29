@@ -25,7 +25,7 @@ const GI = {
 
   // level
   level: 0,
-  startingLevel: 1,
+  startingLevel: 0,
   nextLevel: false, // Set this to true when you wanna move up; it's automatic
 
   init: function () {
@@ -662,11 +662,15 @@ const SplashLayer = {
   width: 4,
   height: 2,
 
+  exists: false, // Cause for some reason the play button kept appearing
+
   init: function() {
     Screen.setBackground(Assets.backgrounds[4]);
+    exists = true;
   },
 
   update: function() {
+    if (!this.exists) return;
     const [adjX, adjY] = [GI.cursorX / GI.unit, GI.cursorY / GI.unit];
 
     if (adjX > this.x && adjX < this.x + this.width && adjY > this.y && adjY < this.y + this.height) {
@@ -685,6 +689,7 @@ const SplashLayer = {
   },
 
   draw: function() {
+    if (!this.exists) return;
     // Manually drawing the button cuz this is the only part of the code with a button like this ig
     let context = Screen.objects;
 
@@ -863,12 +868,16 @@ const HardwareLayer = {
 
 const CLILayer = {
   sprites: [],
-  score: 0,
+  stage: 0, // 0-"game help" 1-"page" 2-"page" 3-"move"
+
+  stageFrame: 0, // number of frames since you entered the current stage of this level.
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
     Screen.setBackground(Assets.backgrounds[1]);
     Screen.setBackground(Assets.backgrounds[2]);
+
+    this.stageFrame = Animator.frame;
 
     Ghost.init();
     Ghost.cage(true); // Put the ghost in the cage :).
@@ -880,6 +889,8 @@ const CLILayer = {
       this.sprites[i].update();
       BaseMap.fixSpriteInBounds(this.sprites[i]);
     }
+
+
   },
 
   draw: function() {
