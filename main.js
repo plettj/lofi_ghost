@@ -350,8 +350,8 @@ const Ghost = {
   angle: 0,
   direction: Direction.NE,
 
-  bobbingAmplitude: 0.2,
-  bobbingFrequency: 0.04,
+  bobbingAmplitude: 1.4,
+  bobbingFrequency: 0.06,
   bobbingPhase: 0,
 
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
@@ -359,6 +359,7 @@ const Ghost = {
     idle: 0,
     follow: 1,
     keys: 2,
+    caged: 3,
   },
 
   spritemap: null,
@@ -373,16 +374,14 @@ const Ghost = {
   init: function() {
     this.spritemap = Assets.spritemaps[0];
     this.speed = GI.pixel * 0.1;
-    this.maxSpeed = GI.pixel * 0.5;
+    this.maxSpeed = GI.pixel * 0.4;
     this.decRadius = GI.unit;
     this.idleRadius = GI.unit / 4;
     this.spookRange = GI.unit * 2;
-
   },
 
   update: function() {
-
-    if (!BaseMap.cursorInBounds()) this.GFUEL = this.states.idle;
+    if (!BaseMap.cursorInBounds() && this.GFUEL != this.states.caged) this.GFUEL = this.states.idle;
 
     const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
     switch(this.GFUEL) {
@@ -413,6 +412,12 @@ const Ghost = {
         break;
       case this.states.keys: // Key controls
         break;
+      case this.states.caged: // Stuck in cage in CLI
+        this.angle = calcAngle2(this.x - GI.cursorX, this.y - GI.cursorY); // Update his orientation!
+        this.x = GI.unit * 13 + GI.pixel * 4;
+        this.y = GI.unit * 2.5;
+        this.adjustBob();
+        break;
     }
 
     this.direction = toDirection(this.angle);
@@ -432,6 +437,14 @@ const Ghost = {
   adjustBob: function() { // manages bobbing height
     this.y += this.bobbingAmplitude * Math.sin(this.bobbingPhase);
     this.bobbingPhase += this.bobbingFrequency;
+  },
+
+  cage: function(entering) {
+    if (entering) { // Put ghost in cage!
+      this.GFUEL = this.states.caged;
+    } else { // Free ghost from cage!
+      this.GFUEL = this.states.idle;
+    }
   }
 }
 
@@ -826,16 +839,32 @@ const HardwareLayer = {
 }
 
 const CLILayer = {
+  sprites: [],
+  score: 0,
+
   init: function() {
-    //
+    Screen.setBackground(Assets.backgrounds[0]);
+    Screen.setBackground(Assets.backgrounds[1]);
+    Screen.setBackground(Assets.backgrounds[2]);
+
+    Ghost.init();
+    Ghost.cage(true); // Put the ghost in the cage :).
+    this.sprites.push(Ghost);
   },
 
   update: function() {
-    //
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].update();
+      BaseMap.fixSpriteInBounds(this.sprites[i]);
+    }
   },
 
   draw: function() {
-    //
+    Screen.clear(Screen.bugs);
+    Screen.clear(Screen.objects);
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].draw();
+    }
   }
 }
 
@@ -899,15 +928,15 @@ function initWorld() {
   // Use the below to skip to the gameplay!
   // HardwareLayer.init(); GI.level = 2; return;
 
-  // if (!Storage.currentData["seenSplashScreen"]) {
-  //   SplashLayer.init();
-  // } else { // Skip the splash screen; seen it already :P
-  //   GI.level = 1;
-  //   IntroLayer.init();
-  // }
+  if (!Storage.currentData["seenSplashScreen"]) {
+    SplashLayer.init();
+  } else { // Skip the splash screen; seen it already :P
+    GI.level = 1;
+    IntroLayer.init();
+  }
 
-  GI.level = 2;
-  HardwareLayer.init();
+  // GI.level = 3;
+  // CLILayer.init();
 }
 
 function updateAll() {
