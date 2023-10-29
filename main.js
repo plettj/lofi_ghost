@@ -22,6 +22,10 @@ const GI = {
   cursorX: 0,
   cursorY: 0,
 
+  // level
+  level: 0,
+  nextLevel: false,
+
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
     this.pixel = this.unit / 8;
@@ -59,7 +63,7 @@ const Storage = {
 
 
 ///////////
-// GAME LOOP
+// RENDERING
 ///////////
 const Screen = {
   layers: 8, // Total layers on our screen
@@ -88,7 +92,7 @@ const Screen = {
     }
 
     this.void = this.contexts[0];
-    this.backgound = this.contexts[1]; // floor and solid walls
+    this.background = this.contexts[1];
     // underground??
     this.objects = this.contexts[5];
     this.bugs = this.contexts[6];
@@ -103,6 +107,20 @@ const Screen = {
       GI.canvasHeight = rect.height;
     }
   },
+
+  clear: function(context) {
+    context.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
+  },
+
+  clearAll: function() {
+    for (let i = 0; i < this.layers; ++i) {
+      this.clear(this.contexts[i]);
+    }
+  },
+
+  setBackground: function(image) {
+    this.background.drawImage(image, 0, 0, GI.canvasWidth, GI.canvasHeight);
+  }
 }
 
 class Spritemap {
@@ -118,22 +136,47 @@ class Spritemap {
     return [x * GI.spriteSize, y * GI.spriteSize];
   }
 
-  drawTile(context, x, y, destX, destY) {
+  drawTile(context, x, y, destX, destY, angle) {
+    context.save();
+    context.translate(destX, destY);
+    if (angle !== undefined) context.rotate(angle * Math.PI / 180);
+    context.translate(-GI.unit / 2, -GI.unit / 2);
     const [xT, yT] = this.getTileCoordinates(x, y);
-    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX, destY, GI.unit, GI.unit); // clipping fix hack
+    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, 0, 0, GI.unit, GI.unit); // clipping fix hack
+    context.restore();
   }
 }
 
 const Assets = {
-  spritemapNames: ["ghost", "hardwarebug"],
+  spritemapNames: ["ghost", "hardwarebug", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons"],
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
+
+  backgroundNames: ["hardware", "cli", "menu"],
+  backgroundsPath: "assets/backgrounds",
+  backgrounds: [],
+
+  sceneNames: ["introDay", "introDayDead", "introNight", "introNightDead"],
+  scenesPath: "assets/scenes",
+  scenes: [],
 
   init: function () {
     for (let i = 0; i < this.spritemapNames.length; i++) {
       let image = new Image();
       image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
       this.spritemaps.push(new Spritemap(image));
+    }
+
+    for (let i = 0; i < this.backgroundNames.length; ++i) {
+      let image = new Image();
+      image.src = this.backgroundsPath + "/" + this.backgroundNames[i] + ".png";
+      this.backgrounds.push(image);
+    }
+
+    for (let i = 0; i < this.sceneNames.length; ++i) {
+      let image = new Image();
+      image.src = this.scenesPath + "/" + this.sceneNames[i] + ".png";
+      this.scenes.push(image);
     }
   },
 }
@@ -237,15 +280,36 @@ function calcAngle2(dx, dy) {
   return Math.atan2(dy, dx) / Math.PI * 180 + 180;
 }
 
+function reverseAngle(angle) {
+  return (angle + 180) % 360;
+}
+
 function toDirection(angle) {
   return Math.floor(angle / 90);
 }
 
-const Dir = {
+function toCardinal(angle) {
+  return Math.floor(((angle + 45) % 360) / 90);
+}
+
+function dcos(angle) {
+  return Math.cos(angle / 180 * Math.PI);
+}
+
+function dsin(angle) {
+  return Math.sin(angle / 180 * Math.PI);
+}
+
+const Direction = {
   NW: 0,
-  SW: 1,
+  NE: 1,
   SE: 2,
-  NE: 3,
+  SW: 3,
+
+  W: 0,
+  N: 1,
+  E: 2,
+  S: 3,
 };
 
 
@@ -254,11 +318,11 @@ const Dir = {
 ///////////
 
 const Ghost = {
-  x: 0,
+  x: 0, // center of sprite
   y: 0,
   speed: 5,
   angle: 0,
-  direction: Dir.N,
+  direction: Direction.NE,
 
   bobbingAmplitude: 0.2,
   bobbingFrequency: 0.04,
@@ -266,25 +330,34 @@ const Ghost = {
 
   GFUEL: 0, // aka Ghostification Factor Under Extreme Layering
   states: {
-    follow: 0,
-    static: 1,
+    idle: 0,
+    follow: 1,
     keys: 2,
   },
 
   spritemap: null,
   spriteCol: 0,
   spriteRow: 0,
+  spriteColTable: [2, 0, 0, 2],
+  spriteRowTable: [0, 0, 1, 1],
+  animState: 0,
+
+  spookRange: 0,
 
   init: function() {
     this.spritemap = Assets.spritemaps[0];
+    this.spookRange = GI.unit * 2;
   },
 
   update: function() {
 
     if (BaseMap.cursorInBounds()) this.GFUEL = this.states.follow;
-    else this.GFUEL = this.states.static;
+    else this.GFUEL = this.states.idle;
 
     switch(this.GFUEL) {
+      case this.states.idle: // Just idle
+        this.adjustBob();
+        break;
       case this.states.follow: // Follow cursor
         const dx = GI.cursorX - this.x;
         const dy = GI.cursorY - this.y;
@@ -292,14 +365,11 @@ const Ghost = {
         const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
         const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
 
-        this.x += (dx - GI.spriteSize / 4) / distance * cappedSpeed;
-        this.y += (dy + GI.spriteSize / 2) / distance * cappedSpeed;
+        this.x += dx / distance * cappedSpeed;
+        this.y += dy / distance * cappedSpeed;
 
-        this.angle = calcAngle2(dy - GI.spriteSize / 4, dx - GI.spriteSize / 4);
+        this.angle = calcAngle2(dx, dy);
 
-        this.adjustBob();
-        break;
-      case this.states.static: // Just idle
         this.adjustBob();
         break;
       case this.states.keys: // Key controls
@@ -311,17 +381,12 @@ const Ghost = {
   },
 
   updateSprite: function() {
-    switch (this.direction) {
-      case Dir.NW: this.spriteCol = 2; break;
-      case Dir.NE: this.spriteCol = 1; break;
-      case Dir.SE: this.spriteCol = 0; break;
-      case Dir.SW: this.spriteCol = 3; break;
-    }
-    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 2;
+    this.animState = (Animator.frame % 30 == 0) ? (this.animState + 1) % 2 : this.animState;
+    this.spriteCol = this.spriteColTable[this.direction] + this.animState;
+    this.spriteRow = this.spriteRowTable[this.direction];
   },
 
   draw: function() {
-    Screen.ghost.clearRect(0, 0, GI.canvasWidth, GI.canvasHeight);
     this.spritemap.drawTile(Screen.ghost, this.spriteCol, this.spriteRow, this.x, this.y);
   },
 
@@ -331,8 +396,114 @@ const Ghost = {
   }
 }
 
-class HardwareBug {
-  //
+class WireSlot {
+  constructor(tileX, tileY) {
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.activated = false;
+    this.range = GI.unit * 2;
+  }
+
+  update() {
+    //
+  }
+
+  draw() {
+    //
+  }
+}
+
+class WireBug {
+  constructor(tileX, tileY, wireSlot) {
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.runSpeed = 5;
+    this.walkSpeed = 1;
+    this.angle = 0;
+    this.runDist = GI.unit * 2;
+    this.targetX = this.x;
+    this.targetY = this.y;
+
+    this.wireSlot = wireSlot;
+
+    this.state = 0;
+    this.states = {
+      wander: 0,
+      running: 1,
+      wiring: 2,
+      wired: 3,
+    }
+
+    this.spritemap = Assets.spritemaps[1];
+    this.spriteCol = 0;
+    this.spriteRow = 0;
+  }
+
+  update() {
+
+    if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot.range) { // wiring takes priority
+      this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
+      this.targetX = this.wireSlot.x;
+      this.targetY = this.wireSlot.y;
+      this.state = this.states.wiring;
+    }
+
+    switch (this.state) {
+      case this.states.wander:
+        if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+          this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
+          [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
+          this.state = this.states.running;
+        } else {
+          if (this.x == this.targetX && this.y == this.targetY) {
+            [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 4 - 2 * GI.unit, this.y + Math.random() * GI.unit * 4 - 2 * GI.unit);
+            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+          }
+          this.moveToTarget(this.states.wander, this.walkSpeed);
+        }
+        break;
+      case this.states.running:
+        this.moveToTarget(this.states.wander, this.runSpeed);
+        break;
+      case this.states.wiring:
+        this.moveToTarget(this.states.wired, this.runSpeed);
+        break;
+      case this.states.wired:
+        break;
+    }
+  }
+
+  moveToTarget(nextState, speed) {
+    if (dist(this.x, this.y, this.targetX, this.targetY) > speed) {
+      this.x += dcos(this.angle) * speed;
+      this.y += dsin(this.angle) * speed;
+    } else {
+      this.x = this.targetX;
+      this.y = this.targetY;
+      this.state = nextState;
+    }
+  }
+
+  draw() {
+    this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
+  }
+};
+
+class LetterBlock {
+  constructor(tileX, tileY) {
+    this.tileX = tileX;
+    this.tileY = tileY;
+    this.letter = 0;
+
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.speed = 10;
+    this.moveDirection = Direction.N;
+    this.xTable = [-this.runDist, 0, this.runDist, 0];
+    this.yTable = [0, -this.runDist, 0, this.runDist];
+  }
+
+  update() {
+    const angle = reverseAngle(calcAngle2(Ghost.x - this.x, Ghost.y - this.y));
+    this.moveDirection = toCardinal(angle);
+  }
 };
 
 
@@ -341,56 +512,86 @@ class HardwareBug {
 ///////////
 
 const BaseMap = {
-  map: [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-  ],
 
-  tilePos: function(x, y) {
+  getTilePos: function(x, y) {
     return [Math.floor(x / GI.unit), Math.floor(y / GI.unit)];
   },
 
-  tileCenter: function(x, y) {
-    const [tileX, tileY] = this.tilePos(x, y);
+  getTileCenter: function(tileX, tileY) {
     return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
   },
 
-  inBounds: function(x, y) {
-    return between(x, 0, GI.canvasWidth) && between(y, 0, GI.canvasHeight)
+  getTileCenterCoords: function(x, y) {
+    return this.getTileCenter(this.getTilePos(x, y))
   },
 
   cursorInBounds: function() {
-    return this.inBounds(GI.cursorX, GI.cursorY);
+    return between(GI.cursorX, 0, GI.canvasWidth) && between(GI.cursorY, 0, GI.canvasHeight);
+  },
+
+  fixSpriteInBounds: function(sprite) {
+    if (sprite.x - GI.unit / 2 < 0) sprite.x = GI.unit / 2;
+    if (sprite.x + GI.unit / 2 > GI.canvasWidth) sprite.x = GI.canvasWidth - GI.unit / 2;
+    if (sprite.y - GI.unit / 2 < 0) sprite.y = GI.unit / 2;
+    if (sprite.y + GI.unit / 2 > GI.canvasHeight) sprite.y = GI.canvasHeight - GI.unit / 2;
+  },
+
+  clamp: function(x, y) {
+    return [clamp(x, GI.unit / 2, GI.canvasWidth - GI.unit / 2), clamp(y, GI.unit / 2, GI.canvasHeight - GI.unit / 2)];
   }
 }
 
 const HardwareLayer = {
-  curr: 0,
+  sprites: [],
 
+  init: function() {
+    Screen.setBackground(Assets.backgrounds[0]);
+
+    Ghost.init();
+    this.sprites.push(Ghost);
+
+    const wireSlot1 = new WireSlot(8, 8);
+    const wireBug1 = new WireBug(5, 5, wireSlot1);
+    // const wireSlot2 = new WireSlot(9, 7);
+    // const wireBug2 = new WireBug(6, 6, wireSlot2);
+    // this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
+    this.sprites.push(wireSlot1, wireBug1);
+  },
+
+  update: function() {
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].update();
+      BaseMap.fixSpriteInBounds(this.sprites[i]);
+    }
+  },
+
+  draw: function() {
+    Screen.clear(Screen.bugs);
+    for (let i = 0; i < this.sprites.length; ++i) {
+      this.sprites[i].draw();
+    }
+  },
+}
+
+const CLILayer = {
   init: function() {
     //
   },
 
-  drawLevel: function() {
-    for (let y = 0; y < GI.height; ++y) {
-      for (let x = 0; x < GI.width; ++x) {
-        
-      }
-    }
-  },
-
-  advanceLevel: function() {
-    this.curr++
+  draw: function() {
+    //
   }
 }
 
+const MenuLayer = {
+  init: function() {
+    //
+  },
+
+  draw: function() {
+    //
+  }
+}
 
 ///////////
 // WHERE IT ALL STARTS
@@ -409,16 +610,36 @@ window.onload = () => {
     GI.cursorY = e.clientY - GI.canvasY;
   }, false);
 
-  Ghost.init();
+  // Init first level
+  HardwareLayer.init();
 
   // Start game loop
   Animator.start();
 }
 
+function goNextLevel() {
+  GI.level++;
+  Screen.clear();
+}
+
 function updateAll() {
-  Ghost.update();
+  if (GI.nextLevel) {
+    GI.nextLevel = false;
+    goNextLevel();
+  }
+
+  switch(GI.level) {
+    case 0: HardwareLayer.update(); break;
+    case 1: CLILayer.update(); break;
+    case 2: MenuLayer.update(); break;
+  }
 }
 
 function drawAll() {
-  Ghost.draw();
+  Screen.clear(Screen.ghost);
+  switch(GI.level) {
+    case 0: HardwareLayer.draw(); break;
+    case 1: CLILayer.draw(); break;
+    case 2: MenuLayer.draw(); break;
+  }
 }
