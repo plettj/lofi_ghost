@@ -747,13 +747,14 @@ const IntroLayer = {
     // bugs: null,
     // ghost: null,
 
+    Screen.background.globalAlpha = this.overallFade;
     Screen.background.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
-
-    Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
+    Screen.background.globalAlpha = 1;
     
     //console.log(this.dayAmount);
     //console.log(Screen.objects.globalAlpha);
-
+    
+    Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
     Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
     Screen.objects.globalAlpha = 1;
 
@@ -931,12 +932,12 @@ function initWorld() {
   // Use the below to skip to the gameplay!
   // HardwareLayer.init(); GI.level = 2; return;
 
-  if (!Storage.currentData["seenSplashScreen"]) {
-    SplashLayer.init();
-  } else { // Skip the splash screen; seen it already :P
-    GI.level = 1;
-    IntroLayer.init();
-  }
+  // if (!Storage.currentData["seenSplashScreen"]) {
+  SplashLayer.init();
+  // } else { // Skip the splash screen; seen it already :P
+  //   GI.level = 1;
+  //   IntroLayer.init();
+  // }
 }
 
 function updateAll() {
