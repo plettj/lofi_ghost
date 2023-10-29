@@ -31,7 +31,7 @@ const GI = {
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
     this.pixel = this.unit / 8;
-    
+
     document.body.style.setProperty("--unit", this.unit + "px");
     document.body.style.setProperty("--width", this.width);
     document.body.style.setProperty("--height", this.height);
@@ -134,7 +134,7 @@ class Spritemap {
     this.col = Math.floor(this.width / GI.spriteSize);
     this.row = Math.floor(this.height / GI.spriteSize);
   }
-  
+
   getTileCoordinates(x, y) {
     return [x * GI.spriteSize, y * GI.spriteSize];
   }
@@ -235,7 +235,7 @@ const Animator = {
 
     if (Animator.elapsed > Animator.fpsInterval) { // If enough time has elapsed, draw the next frame
       Animator.then = Animator.now - (Animator.elapsed % Animator.fpsInterval);
-      
+
       if (!Animator.paused) { // GAME LOOP
         updateAll();
         drawAll();
@@ -263,7 +263,7 @@ function keyPressed(code, pressed) {
 
 document.addEventListener("keydown", (event) => {
   let k = event.code;
-  
+
   if (k == 9 || k == 38 || k == 40) {
     event.preventDefault();
   } else if (k == 123 || (event.ctrlKey && event.shiftKey && (k == 73 || k == 74))) {
@@ -753,7 +753,7 @@ const IntroLayer = {
 
   update: function() {
     const step = Animator.frame - this.startFrame;
-    const transitions = [0, 100, 300, 400, 500, 600, 700, 1400, 1700];
+    const transitions = [0, 100, 300, 400, 500, 600, 700, 1400, 1650];
     let stage = 0;
 
     while (!between(step, transitions[stage] - 1, transitions[stage + 1]) && stage < transitions.length - 1) {
@@ -772,10 +772,8 @@ const IntroLayer = {
       case 3:
         this.dayAmount += 1;
         break;
-      case 4:
-        document.body.querySelector("#Intro2").style.opacity = 1;
-        break;
       case 5:
+        document.body.querySelector("#Intro2").style.opacity = 1;
         this.dayAmount -= 1;
         break;
       case 6:
@@ -801,8 +799,8 @@ const IntroLayer = {
             }
           }
         }
-        
-        this.lifeAmount -= 0.25;
+
+        this.lifeAmount -= 0.5;
         if (this.lifeAmount < 0) {
           this.lifeAmount = 0;
         }
@@ -826,12 +824,12 @@ const IntroLayer = {
 
   draw: function() {
     Screen.clearAll();
-    
+
     if (this.lifeAmount > 99) {
       Screen.background.globalAlpha = this.overallFade;
       Screen.background.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.background.globalAlpha = 1;
-      
+
       Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
       Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.objects.globalAlpha = 1;
@@ -847,7 +845,7 @@ const IntroLayer = {
       Screen.bugs.globalAlpha = clamp(Math.min(this.lifeAmount / 100, this.dayAmount / 100), 0, 1) * this.overallFade;
       Screen.bugs.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.bugs.globalAlpha = 1;
-      
+
       Screen.ghost.globalAlpha = clamp(Math.min(this.lifeAmount / 100, this.dayAmount * -1 / 100 + 1), 0, 1) * this.overallFade;
       Screen.ghost.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.ghost.globalAlpha = 1;
@@ -907,6 +905,8 @@ const CLILayer = {
 
   stageFrame: 0, // number of frames since you entered the current stage of this level.
 
+  menuItems: document.querySelector(".cli"), // [letters, str1, input1, str2, input2, str3, input3, str4, input4]
+
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
     Screen.setBackground(Assets.backgrounds[1]);
@@ -925,7 +925,24 @@ const CLILayer = {
       BaseMap.fixSpriteInBounds(this.sprites[i]);
     }
 
+    const step = Animator.frame - this.stageFrame;
+    const cliDelay = 30;
 
+    if (step == 30) {
+      // Initialize the current stage of the CLI level
+      switch (this.stage) {
+        case 0:
+          menuItems[0].style.opacity = 1;
+          menuItems[1].style.opacity = 1;
+          menuItems[2].style.opacity = 1;
+          menuItems[2].focus();
+          break;
+      }
+    }
+
+    if (step >= transitions[transitions.length - 1]) {
+      GI.nextLevel = true;
+    }
   },
 
   draw: function() {

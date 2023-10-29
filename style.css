@@ -69,6 +69,12 @@ p {
   opacity: 0;
 }
 
+#CLI0 {
+  font-size: calc(var(--unit) / 5);
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.1);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.5);
+}
+
 #CLI1 {
   left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
   top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.5);
