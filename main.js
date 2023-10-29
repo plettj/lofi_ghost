@@ -685,7 +685,7 @@ const IntroLayer = {
 
   update: function() {
     const step = Animator.frame - this.startFrame;
-    const transitions = [0, 100, 300, 400, 500, 600, 700, 1200, 1460];
+    const transitions = [0, 100, 300, 400, 500, 600, 700, 1400, 1700];
     let stage = 0;
 
     while (!between(step, transitions[stage] - 1, transitions[stage + 1]) && stage < transitions.length - 1) {
@@ -699,9 +699,13 @@ const IntroLayer = {
         break;
       case 1:
         this.dayAmount -= 0.5;
+        document.body.querySelector("#Intro1").style.opacity = 1;
         break;
       case 3:
         this.dayAmount += 1;
+        break;
+      case 4:
+        document.body.querySelector("#Intro2").style.opacity = 1;
         break;
       case 5:
         this.dayAmount -= 1;
@@ -740,6 +744,8 @@ const IntroLayer = {
 
           if (this.overallFade <= 0) {
             this.overallFade = 0;
+            document.body.querySelector("#Intro1").style.opacity = 0;
+            document.body.querySelector("#Intro2").style.opacity = 0;
           }
         }
         break;
@@ -751,16 +757,9 @@ const IntroLayer = {
   },
 
   draw: function() {
-    // sceneNames: ["introDay", "introDayDead", "introNight", "introNightDead"],
-
-    // Draw all the things then set their 
-    // background: null,
-    // objects: null,
-    // bugs: null,
-    // ghost: null,
     Screen.clearAll();
-
-    if (this.lifeAmount > 0) {
+    
+    if (this.lifeAmount > 99) {
       Screen.background.globalAlpha = this.overallFade;
       Screen.background.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.background.globalAlpha = 1;
@@ -768,15 +767,21 @@ const IntroLayer = {
       Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
       Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.objects.globalAlpha = 1;
-    }
+    } else {
+      Screen.background.globalAlpha = this.overallFade;
+      Screen.background.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      Screen.background.globalAlpha = 1;
 
-    if (this.lifeAmount < 99) {
-      Screen.bugs.globalAlpha = clamp(average(this.lifeAmount * -1 / 100 + 1, this.dayAmount / 100), 0, 1) * this.overallFade;
-      Screen.bugs.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
+      Screen.objects.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      Screen.objects.globalAlpha = 1;
+
+      Screen.bugs.globalAlpha = clamp(Math.min(this.lifeAmount / 100, this.dayAmount / 100), 0, 1) * this.overallFade;
+      Screen.bugs.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.bugs.globalAlpha = 1;
-
-      Screen.ghost.globalAlpha = clamp(average(this.lifeAmount * -1 / 100 + 1, this.dayAmount * -1 / 100 + 1), 0, 1) * this.overallFade;
-      Screen.ghost.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      
+      Screen.ghost.globalAlpha = clamp(Math.min(this.lifeAmount / 100, this.dayAmount * -1 / 100 + 1), 0, 1) * this.overallFade;
+      Screen.ghost.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
       Screen.ghost.globalAlpha = 1;
     }
   }
