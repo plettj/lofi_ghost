@@ -341,8 +341,8 @@ const Ghost = {
         this.adjustBob();
         break;
       case this.states.follow: // Follow cursor
-        const dx = clamp(GI.cursorX, GI.unit / 2, GI.canvasWidth - GI.unit / 2) - this.x;
-        const dy = clamp(GI.cursorY, GI.unit / 2, GI.canvasHeight - GI.unit / 2) - this.y;
+        const dx = GI.cursorX - this.x;
+        const dy = GI.cursorY - this.y;
 
         const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
         const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
