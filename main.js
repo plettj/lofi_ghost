@@ -84,7 +84,6 @@ const Screen = {
       canvas.id = "Canvas" + i;
       canvas.width = GI.unit * GI.width;
       canvas.height = GI.unit * GI.height;
-      canvas.style.setProperty("background-color", "transparent");
       document.body.insertBefore(canvas, belowCanvases);
 
       let context = canvas.getContext("2d");
@@ -149,7 +148,7 @@ class Spritemap {
 }
 
 const Assets = {
-  spritemapNames: ["ghost", "hardwarebug", "hardwareTileset, cliBreakTop, cliBreakBottom, buttons"],
+  spritemapNames: ["ghost", "hardwarebug", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons"],
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
 
