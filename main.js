@@ -66,7 +66,7 @@ const Storage = {
 // RENDERING
 ///////////
 const Screen = {
-  layers: 8, // Total layers on our screen
+  layers: 9, // Total layers on our screen
   contexts: [],
 
   // layer aliases
@@ -74,6 +74,7 @@ const Screen = {
   background: null,
   objects: null,
   bugs: null,
+  covers: null,
   ghost: null,
   screen: null,
 
@@ -93,10 +94,10 @@ const Screen = {
 
     this.void = this.contexts[0];
     this.background = this.contexts[1];
-    // underground??
     this.objects = this.contexts[5];
     this.bugs = this.contexts[6];
-    this.ghost = this.contexts[7];
+    this.covers = this.contexts[7];
+    this.ghost = this.contexts[8];
 
     const canvas = document.getElementById("Canvas0");
     if (canvas) {
@@ -298,7 +299,7 @@ function reverseAngle(angle) {
 }
 
 function toDirection(angle) {
-  return Math.floor(angle / 90);
+  return Math.floor(((angle + 180) % 360) / 90);
 }
 
 function toCardinal(angle) {
@@ -333,7 +334,11 @@ const Direction = {
 const Ghost = {
   x: 0, // center of sprite
   y: 0,
-  speed: 5,
+  speed: 0,
+  maxSpeed: 0,
+  acc: 0.07,
+  decRadius: 0,
+  idleRadius: 0,
   angle: 0,
   direction: Direction.NE,
 
@@ -359,29 +364,42 @@ const Ghost = {
 
   init: function() {
     this.spritemap = Assets.spritemaps[0];
+    this.speed = GI.pixel * 0.1;
+    this.maxSpeed = GI.pixel * 0.5;
+    this.decRadius = GI.unit;
+    this.idleRadius = GI.unit / 4;
     this.spookRange = GI.unit * 2;
+
   },
 
   update: function() {
 
-    if (BaseMap.cursorInBounds()) this.GFUEL = this.states.follow;
-    else this.GFUEL = this.states.idle;
+    if (!BaseMap.cursorInBounds()) this.GFUEL = this.states.idle;
 
+    const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
     switch(this.GFUEL) {
       case this.states.idle: // Just idle
+        if (distance > this.idleRadius && BaseMap.cursorInBounds()) {
+          this.GFUEL = this.states.follow;
+        }
         this.adjustBob();
         break;
       case this.states.follow: // Follow cursor
-        const dx = GI.cursorX - this.x;
-        const dy = GI.cursorY - this.y;
 
-        const distance = dist(GI.cursorX, GI.cursorY, this.x, this.y);
-        const cappedSpeed = Math.min(this.speed, distance / Animator.fps);
+        if (distance > this.decRadius) {
+          this.speed += this.acc;
+        } else if (distance > this.idleRadius) {
+          this.speed -= this.acc;
+        } else {
+          this.speed = 0;
+          this.GFUEL = this.states.idle;
+        }
 
-        this.x += dx / distance * cappedSpeed;
-        this.y += dy / distance * cappedSpeed;
+        this.speed = clamp(this.speed, 0, this.maxSpeed);
+        this.angle = calcAngle2(this.x - GI.cursorX, this.y - GI.cursorY);
 
-        this.angle = calcAngle2(dx, dy);
+        this.x += dcos(this.angle) * this.speed;
+        this.y += dsin(this.angle) * this.speed;
 
         this.adjustBob();
         break;
@@ -410,11 +428,15 @@ const Ghost = {
 }
 
 class WireSlot {
-  constructor(tileX, tileY) {
-    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+  constructor(pixelX, pixelY, spriteCol, spriteRow) {
+    [this.x, this.y] = [BaseMap.toCoords(pixelX), BaseMap.toCoords(pixelY)];
     this.activated = false;
     this.range = GI.unit * 2;
+
     this.spritemap = Assets.spritemaps[2];
+    this.spriteCol = spriteCol;
+    this.spriteRow = spriteRow;
+    this.animState = 0;
   }
 
   update() {
@@ -422,19 +444,20 @@ class WireSlot {
   }
 
   draw() {
-    if (this.activated) {
-      //
+    if (!this.activated) {
+      if (Animator.frame % 5 == 0) this.animState = (this.animState + 1) % 3;
+      this.spritemap.drawTile(Screen.objects, this.spriteCol + this.animState, this.spriteRow, this.x, this.y, this.angle);
     }
   }
 }
 
 class WireBug {
-  constructor(tileX, tileY, wireSlot) {
+  constructor(tileX, tileY, wireSlot, spriteCol, spriteRow) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
-    this.runSpeed = 5;
-    this.walkSpeed = 1;
+    this.runSpeed = GI.pixel * 0.8;
+    this.walkSpeed = GI.pixel * 0.1;
     this.angle = 0;
-    this.runDist = GI.unit * 2;
+    this.runDist = GI.unit;
     this.targetX = this.x;
     this.targetY = this.y;
 
@@ -446,32 +469,31 @@ class WireBug {
       running: 1,
       wiring: 2,
       wired: 3,
+      inactive: 4,
     }
 
     this.spritemap = Assets.spritemaps[1];
-    this.spriteCol = 0;
-    this.spriteRow = 0;
+    this.spriteCol = spriteCol;
+    this.spriteRow = spriteRow;
     this.animState = 0;
   }
 
   update() {
 
-    if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot.range) { // wiring takes priority
-      this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
-      this.targetX = this.wireSlot.x;
-      this.targetY = this.wireSlot.y;
-      this.state = this.states.wiring;
-    }
-
     switch (this.state) {
       case this.states.wander:
-        if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+        if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot.range) {
+          this.targetX = this.wireSlot.x;
+          this.targetY = this.wireSlot.y;
+          this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+          this.state = this.states.wiring;
+        } else if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
           this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
           [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
           this.state = this.states.running;
         } else {
           if (this.x == this.targetX && this.y == this.targetY) {
-            [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 4 - 2 * GI.unit, this.y + Math.random() * GI.unit * 4 - 2 * GI.unit);
+            [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 2 - GI.unit, this.y + Math.random() * GI.unit * 2 - GI.unit);
             this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
           }
           this.moveToTarget(this.states.wander, this.walkSpeed);
@@ -484,6 +506,9 @@ class WireBug {
         this.moveToTarget(this.states.wired, this.runSpeed);
         break;
       case this.states.wired:
+        this.wireSlot.activated = true;
+        this.state = this.states.inactive;
+        HardwareLayer.score++;
         break;
     }
   }
@@ -500,9 +525,38 @@ class WireBug {
   }
 
   draw() {
-    if (Animator.frame % 15 == 0) this.animState = (this.animState + 1) % 2;
-    this.spriteCol = this.animState;
-    this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
+    if (this.state != this.states.inactive) {
+      if (Animator.frame % 15 == 0) this.animState = (this.animState + 1) % 2;
+      this.spritemap.drawTile(Screen.bugs, this.spriteCol + this.animState, this.spriteRow, this.x, this.y, this.angle);
+    }
+  }
+};
+
+const HardwareProgress = {
+  x: 0,
+  y: 0,
+  spritemap: null,
+  progress: 4,
+  spriteCoords: [
+    [[0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1]],
+    [[0, 1, 2, 0, 1, 2], [2, 2, 2, 3, 3, 3]],
+    [[0, 1, 2, 0, 1, 2], [4, 4, 4, 5, 5, 5]],
+    [[0, 1, 2, 0, 1, 2], [6, 6, 6, 7, 7, 7]],
+    [[0, 1, 2, 0, 1, 2], [8, 8, 8, 9, 9, 9]],
+  ],
+
+  init: function() {
+    [this.x, this.y] = BaseMap.getTileCenter(5, 5);
+    this.spritemap = Assets.spritemaps[2];
+  },
+
+  update: function() {
+    if (HardwareLayer.score > this.progress) this.progress = HardwareLayer.score;
+  },
+
+  draw: function() {
+    const [spriteCol, spriteRow] = this.spriteCoords[this.progress];
+    this.spritemap.drawTile(Screen.covers, spriteCol[0], spriteCol[0], this.x, this.y); // ?!?!?!
   }
 };
 
@@ -538,6 +592,10 @@ const BaseMap = {
 
   getTileCenter: function(tileX, tileY) {
     return [tileX * GI.unit + GI.unit / 2, tileY * GI.unit + GI.unit / 2];
+  },
+
+  toCoords: function(gp) {
+    return gp * GI.pixel;
   },
 
   getTileCenterCoords: function(x, y) {
@@ -605,6 +663,7 @@ const IntroLayer = {
 
 const HardwareLayer = {
   sprites: [],
+  score: 0,
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
@@ -612,11 +671,14 @@ const HardwareLayer = {
     Ghost.init();
     this.sprites.push(Ghost);
 
-    const wireSlot1 = new WireSlot(7, 7);
-    const wireBug1 = new WireBug(14, 5, wireSlot1);
-    const wireSlot2 = new WireSlot(9, 7);
-    const wireBug2 = new WireBug(13, 8, wireSlot2);
-    this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
+    const wireSlotBlue = new WireSlot(21, 21, 3, 4);
+    const wireBugBlue = new WireBug(14, 0, wireSlotBlue, 0, 0);
+    const wireSlotPurple = new WireSlot(28, 28, 3, 5);
+    const wireBugPurple = new WireBug(12, 2, wireSlotPurple, 2, 0);
+    this.sprites.push(wireSlotBlue, wireSlotPurple, wireBugBlue, wireBugPurple);
+
+    HardwareProgress.init();
+    this.sprites.push(HardwareProgress);
   },
 
   update: function() {
@@ -628,6 +690,9 @@ const HardwareLayer = {
 
   draw: function() {
     Screen.clear(Screen.bugs);
+    Screen.clear(Screen.objects);
+    Screen.clear(Screen.covers);
+    Screen.covers.drawImage(Assets.backgrounds[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
     for (let i = 0; i < this.sprites.length; ++i) {
       this.sprites[i].draw();
     }
