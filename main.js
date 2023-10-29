@@ -93,7 +93,7 @@ const Screen = {
     }
 
     this.void = this.contexts[0];
-    this.backgound = this.contexts[1]; // floor and solid walls
+    this.background = this.contexts[1];
     // underground??
     this.objects = this.contexts[5];
     this.bugs = this.contexts[6];
@@ -117,6 +117,10 @@ const Screen = {
     for (let i = 0; i < this.layers; ++i) {
       this.clear(this.contexts[i]);
     }
+  },
+
+  setBackground: function(image) {
+    this.background.drawImage(image, 0, 0, GI.canvasWidth, GI.canvasHeight);
   }
 }
 
@@ -133,18 +137,13 @@ class Spritemap {
     return [x * GI.spriteSize, y * GI.spriteSize];
   }
 
-  drawTile(context, x, y, destX, destY) {
-    const [xT, yT] = this.getTileCoordinates(x, y);
-    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
-  }
-
-  drawRotatedTile(context, x, y, destX, destY, angle) {
-    const [xT, yT] = this.getTileCoordinates(x, y);
+  drawTile(context, x, y, destX, destY, angle) {
     context.save();
     context.translate(destX, destY);
-    context.rotate(angle / 180 * Math.PI);
-    context.translate(-xT, -yT);
-    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, destX - GI.unit / 2, destY - GI.unit / 2, GI.unit, GI.unit); // clipping fix hack
+    if (angle !== undefined) context.rotate(angle * Math.PI / 180);
+    context.translate(-GI.unit / 2, -GI.unit / 2);
+    const [xT, yT] = this.getTileCoordinates(x, y);
+    context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, 0, 0, GI.unit, GI.unit); // clipping fix hack
     context.restore();
   }
 }
@@ -154,11 +153,31 @@ const Assets = {
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
 
+  backgroundNames: ["hardware", "cli", "menu"],
+  backgroundsPath: "assets/backgrounds",
+  backgrounds: [],
+
+  sceneNames: ["introDay", "introDayDead", "introNight", "introNightDead"],
+  scenesPath: "assets/scenes",
+  scenes: [],
+
   init: function () {
     for (let i = 0; i < this.spritemapNames.length; i++) {
       let image = new Image();
       image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
       this.spritemaps.push(new Spritemap(image));
+    }
+
+    for (let i = 0; i < this.backgroundNames.length; ++i) {
+      let image = new Image();
+      image.src = this.backgroundsPath + "/" + this.backgroundNames[i] + ".png";
+      this.backgrounds.push(image);
+    }
+
+    for (let i = 0; i < this.sceneNames.length; ++i) {
+      let image = new Image();
+      image.src = this.scenesPath + "/" + this.sceneNames[i] + ".png";
+      this.scenes.push(image);
     }
   },
 }
@@ -397,11 +416,12 @@ class WireSlot {
 class WireBug {
   constructor(tileX, tileY, wireSlot) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
-    this.speed = 3;
+    this.runSpeed = 5;
+    this.walkSpeed = 1;
     this.angle = 0;
     this.runDist = GI.unit * 2;
-    this.dx = 0;
-    this.dy = 0;
+    this.targetX = this.x;
+    this.targetY = this.y;
 
     this.wireSlot = wireSlot;
 
@@ -420,7 +440,7 @@ class WireBug {
 
   update() {
 
-    if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot) { // wiring takes priority
+    if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot.range) { // wiring takes priority
       this.angle = calcAngle2(this.targetX - this.x, this.targetY - this.y);
       this.targetX = this.wireSlot.x;
       this.targetY = this.wireSlot.y;
@@ -430,35 +450,32 @@ class WireBug {
     switch (this.state) {
       case this.states.wander:
         if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
-          this.angle = calcAngle2(Ghost.x - this.x, Ghost.y - this.y);
-          this.targetX = this.x + this.runDist * dcos(this.angle);
-          this.targetY = this.y + this.runDist * dsin(this.angle);
+          this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
+          [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
           this.state = this.states.running;
         } else {
-          this.wander();
+          if (this.x == this.targetX && this.y == this.targetY) {
+            [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 4 - 2 * GI.unit, this.y + Math.random() * GI.unit * 4 - 2 * GI.unit);
+            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+          }
+          this.moveToTarget(this.states.wander, this.walkSpeed);
         }
         break;
       case this.states.running:
-        this.moveToTarget(this.states.wander);
+        this.moveToTarget(this.states.wander, this.runSpeed);
         break;
       case this.states.wiring:
-        this.moveToTarget(this.states.wired);
+        this.moveToTarget(this.states.wired, this.runSpeed);
         break;
       case this.states.wired:
         break;
     }
-
-    this.updateSprite();
   }
 
-  wander() {
-    //
-  }
-
-  moveToTarget(nextState) {
-    if (dist(this.x, this.y, this.targetX, this.targetY) > this.speed) {
-      this.x += dcos(this.angle) * this.speed;
-      this.y += dsin(this.angle) * this.speed;
+  moveToTarget(nextState, speed) {
+    if (dist(this.x, this.y, this.targetX, this.targetY) > speed) {
+      this.x += dcos(this.angle) * speed;
+      this.y += dsin(this.angle) * speed;
     } else {
       this.x = this.targetX;
       this.y = this.targetY;
@@ -466,35 +483,10 @@ class WireBug {
     }
   }
 
-  updateSprite() {
-    if (this.runDist > 0 && Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 4;
-  }
-
   draw() {
-    //this.spritemap.drawRotatedTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
-    this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y);
+    this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
   }
 };
-
-const BugManager = {
-  bugs: [],
-
-  init: function() {
-  },
-
-  updateBugs: function() {
-    for (let i = 0; i < this.bugs.length; ++i) {
-     this.bugs[i].update();
-    }
-  },
-
-  drawBugs: function() {
-    Screen.clear(Screen.bugs);
-    for (let i = 0; i < this.bugs.length; ++i) {
-      this.bugs[i].draw();
-    }
-  }
-}
 
 class LetterBlock {
   constructor(tileX, tileY) {
@@ -544,20 +536,27 @@ const BaseMap = {
     if (sprite.y - GI.unit / 2 < 0) sprite.y = GI.unit / 2;
     if (sprite.y + GI.unit / 2 > GI.canvasHeight) sprite.y = GI.canvasHeight - GI.unit / 2;
   },
+
+  clamp: function(x, y) {
+    return [clamp(x, GI.unit / 2, GI.canvasWidth - GI.unit / 2), clamp(y, GI.unit / 2, GI.canvasHeight - GI.unit / 2)];
+  }
 }
 
 const HardwareLayer = {
   sprites: [],
 
   init: function() {
+    Screen.setBackground(Assets.backgrounds[0]);
+
     Ghost.init();
     this.sprites.push(Ghost);
 
     const wireSlot1 = new WireSlot(8, 8);
     const wireBug1 = new WireBug(5, 5, wireSlot1);
-    const wireSlot2 = new WireSlot(9, 7);
-    const wireBug2 = new WireBug(6, 6, wireSlot2);
-    this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
+    // const wireSlot2 = new WireSlot(9, 7);
+    // const wireBug2 = new WireBug(6, 6, wireSlot2);
+    // this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
+    this.sprites.push(wireSlot1, wireBug1);
   },
 
   update: function() {
@@ -611,10 +610,6 @@ window.onload = () => {
     GI.cursorX = e.clientX - GI.canvasX;
     GI.cursorY = e.clientY - GI.canvasY;
   }, false);
-
-  // temp background
-  Screen.void.fillStyle = "white";
-  Screen.void.fillRect(0, 0, GI.canvasWidth, GI.canvasHeight);
 
   // Init first level
   HardwareLayer.init();
