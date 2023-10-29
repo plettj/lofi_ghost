@@ -569,11 +569,11 @@ const SplashLayer = {
   height: 2,
 
   init: function() {
-    Screen.setBackground(Assets.scenes[0]);
-    console.log("wazzup");
+    Screen.setBackground(Assets.backgrounds[4]);
   },
 
   draw: function() {
+    console.log("wazzup");
     // Manually drawing the button cuz this is the only part of the code with a button like this ig
     let context = Assets.spritemaps[6];
 
@@ -639,6 +639,10 @@ const CLILayer = {
     //
   },
 
+  update: function() {
+    //
+  },
+
   draw: function() {
     //
   }
@@ -646,6 +650,24 @@ const CLILayer = {
 
 const MenuLayer = {
   init: function() {
+    //
+  },
+
+  update: function() {
+    //
+  },
+
+  draw: function() {
+    //
+  }
+}
+
+const OutroLayer = {
+  init: function() {
+    //
+  },
+
+  update: function() {
     //
   },
 
@@ -681,7 +703,10 @@ function goNextLevel() {
 }
 
 function initWorld() {
-  HardwareLayer.init();
+  // START FIRST LEVEL
+
+  SplashLayer.init();
+  //HardwareLayer.init();
 }
 
 function updateAll() {
@@ -691,17 +716,23 @@ function updateAll() {
   }
 
   switch(GI.level) {
-    case 0: HardwareLayer.update(); break;
-    case 1: CLILayer.update(); break;
-    case 2: MenuLayer.update(); break;
+    case 0: SplashLayer.update(); break;
+    case 1: IntroLayer.update(); break;
+    case 2: HardwareLayer.update(); break;
+    case 3: CLILayer.update(); break;
+    case 4: MenuLayer.update(); break;
+    case 5: OutroLayer.update(); break;
   }
 }
 
 function drawAll() {
   Screen.clear(Screen.ghost);
   switch(GI.level) {
-    case 0: HardwareLayer.draw(); break;
-    case 1: CLILayer.draw(); break;
-    case 2: MenuLayer.draw(); break;
+    case 0: SplashLayer.draw(); break;
+    case 1: IntroLayer.draw(); break;
+    case 2: HardwareLayer.draw(); break;
+    case 3: CLILayer.draw(); break;
+    case 4: MenuLayer.draw(); break;
+    case 5: OutroLayer.draw(); break;
   }
 }
