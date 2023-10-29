@@ -899,12 +899,15 @@ function initWorld() {
   // Use the below to skip to the gameplay!
   // HardwareLayer.init(); GI.level = 2; return;
 
-  if (!Storage.currentData["seenSplashScreen"]) {
-    SplashLayer.init();
-  } else { // Skip the splash screen; seen it already :P
-    GI.level = 1;
-    IntroLayer.init();
-  }
+  // if (!Storage.currentData["seenSplashScreen"]) {
+  //   SplashLayer.init();
+  // } else { // Skip the splash screen; seen it already :P
+  //   GI.level = 1;
+  //   IntroLayer.init();
+  // }
+
+  GI.level = 2;
+  HardwareLayer.init();
 }
 
 function updateAll() {
