@@ -21,10 +21,11 @@ const GI = {
   // cursor, relative to canvas
   cursorX: 0,
   cursorY: 0,
+  clicked: false,
 
   // level
   level: 0,
-  nextLevel: false,
+  nextLevel: false, // Set this to true when you wanna move up; it's automatic
 
   init: function () {
     this.unit = (window.innerWidth / 16 > window.innerHeight / 9) ? Math.floor(window.innerHeight / (this.height + 0.5) / 4) * 4 : Math.floor(window.innerWidth / (this.width + 0.5) / 4) * 4;
@@ -33,7 +34,7 @@ const GI = {
     document.body.style.setProperty("--unit", this.unit + "px");
     document.body.style.setProperty("--width", this.width);
     document.body.style.setProperty("--height", this.height);
-  }
+  },
 }
 
 const Storage = {
@@ -225,6 +226,7 @@ const Animator = {
       if (!Animator.paused) { // GAME LOOP
         updateAll();
         drawAll();
+        GI.clicked = false;
         Animator.frame++;
       }
     }
@@ -265,6 +267,7 @@ document.addEventListener("keyup", (event) => {
 
 document.addEventListener("mousedown", (event) => {
   event.preventDefault();
+  GI.clicked = true;
   return false;
 });
 
@@ -572,23 +575,31 @@ const SplashLayer = {
     Screen.setBackground(Assets.backgrounds[4]);
   },
 
-  draw: function() {
-    console.log("wazzup");
-    // Manually drawing the button cuz this is the only part of the code with a button like this ig
-    let context = Assets.spritemaps[6];
-
+  update: function() {
     const [adjX, adjY] = [GI.cursorX / GI.unit, GI.cursorY / GI.unit];
 
     if (adjX > this.x && adjX < this.x + this.width && adjY > this.y && adjY < this.y + this.height) {
-      hovered = true;
+      this.hovered = true;
     } else {
-      hovered = false;
+      this.hovered = false;
     }
 
+    console.log(GI.clicked);
+
+    if (this.hovered && GI.clicked) {
+      GI.nextLevel = true;
+    }
+  },
+
+  draw: function() {
+    // Manually drawing the button cuz this is the only part of the code with a button like this ig
+    let context = Screen.objects;
+
+    Screen.clear(context); // Clearing is OK cause the play button is the only thing on it when this menu is active
     context.save();
     context.translate(GI.unit * this.x, GI.unit * this.y);
-    const yT = hovered ? 10 * 8 * this.width : 0;
-    context.drawImage(this.image, 0, yT, 10 * 8 * this.width, 10 * 8 * this.height, 0, 0, GI.unit * this.width, GI.unit * this.height); // clipping fix hack
+    const yT = this.hovered ? 10 * 8 * this.height : 0;
+    context.drawImage(Assets.spritemaps[6].image, 0, yT, 10 * 8 * this.width, 10 * 8 * this.height, 0, 0, GI.unit * this.width, GI.unit * this.height); // clipping fix hack
     context.restore();
   }
 }
@@ -596,6 +607,10 @@ const SplashLayer = {
 const IntroLayer = {
   init: function() {
     Screen.setBackground(Assets.scenes[0]);
+  },
+
+  update: function() {
+    //
   },
 
   draw: function() {
@@ -698,8 +713,10 @@ window.onload = () => {
 }
 
 function goNextLevel() {
+  Screen.clearAll();
   GI.level++;
-  Screen.clear();
+
+  getLayer(GI.level).init();
 }
 
 function initWorld() {
@@ -715,24 +732,23 @@ function updateAll() {
     goNextLevel();
   }
 
-  switch(GI.level) {
-    case 0: SplashLayer.update(); break;
-    case 1: IntroLayer.update(); break;
-    case 2: HardwareLayer.update(); break;
-    case 3: CLILayer.update(); break;
-    case 4: MenuLayer.update(); break;
-    case 5: OutroLayer.update(); break;
-  }
+  getLayer(GI.level).update();
 }
 
 function drawAll() {
   Screen.clear(Screen.ghost);
-  switch(GI.level) {
-    case 0: SplashLayer.draw(); break;
-    case 1: IntroLayer.draw(); break;
-    case 2: HardwareLayer.draw(); break;
-    case 3: CLILayer.draw(); break;
-    case 4: MenuLayer.draw(); break;
-    case 5: OutroLayer.draw(); break;
+
+  getLayer(GI.level).draw();
+}
+
+// All the levels in our game, ordered!
+function getLayer(i) {
+  switch(i) {
+    case 0: return SplashLayer;
+    case 1: return IntroLayer;
+    case 2: return HardwareLayer;
+    case 3: return CLILayer;
+    case 4: return MenuLayer;
+    case 5: return OutroLayer;
   }
 }
