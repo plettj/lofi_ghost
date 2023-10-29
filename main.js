@@ -148,11 +148,11 @@ class Spritemap {
 }
 
 const Assets = {
-  spritemapNames: ["ghost", "hardwarebug", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons"],
+  spritemapNames: ["ghost", "bugs", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons"],
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
 
-  backgroundNames: ["hardware", "cli", "menu"],
+  backgroundNames: ["hardware", "hardwareObjects", "cli", "menu"],
   backgroundsPath: "assets/backgrounds",
   backgrounds: [],
 
@@ -160,23 +160,36 @@ const Assets = {
   scenesPath: "assets/scenes",
   scenes: [],
 
+  imagesLoaded: 0,
+  totalImageCount: 14,
+
   init: function () {
+    const handleAllImagesLoaded = () => {
+      this.imagesLoaded++;
+      if (this.imagesLoaded >= this.totalImageCount) {
+        initWorld();
+      }
+    };
+
     for (let i = 0; i < this.spritemapNames.length; i++) {
       let image = new Image();
       image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
       this.spritemaps.push(new Spritemap(image));
+      image.onload = handleAllImagesLoaded;
     }
 
     for (let i = 0; i < this.backgroundNames.length; ++i) {
       let image = new Image();
       image.src = this.backgroundsPath + "/" + this.backgroundNames[i] + ".png";
       this.backgrounds.push(image);
+      image.onload = handleAllImagesLoaded;
     }
 
     for (let i = 0; i < this.sceneNames.length; ++i) {
       let image = new Image();
       image.src = this.scenesPath + "/" + this.sceneNames[i] + ".png";
       this.scenes.push(image);
+      image.onload = handleAllImagesLoaded;
     }
   },
 }
@@ -455,6 +468,7 @@ class WireBug {
         } else {
           if (this.x == this.targetX && this.y == this.targetY) {
             [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 4 - 2 * GI.unit, this.y + Math.random() * GI.unit * 4 - 2 * GI.unit);
+            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
           }
           this.moveToTarget(this.states.wander, this.walkSpeed);
         }
@@ -471,7 +485,6 @@ class WireBug {
   }
 
   moveToTarget(nextState, speed) {
-    this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
     if (dist(this.x, this.y, this.targetX, this.targetY) > speed) {
       this.x += dcos(this.angle) * speed;
       this.y += dsin(this.angle) * speed;
@@ -550,7 +563,7 @@ const HardwareLayer = {
     Ghost.init();
     this.sprites.push(Ghost);
 
-    const wireSlot1 = new WireSlot(8, 8);
+    const wireSlot1 = new WireSlot(7, 7);
     const wireBug1 = new WireBug(5, 5, wireSlot1);
     // const wireSlot2 = new WireSlot(9, 7);
     // const wireBug2 = new WireBug(6, 6, wireSlot2);
@@ -610,16 +623,16 @@ window.onload = () => {
     GI.cursorY = e.clientY - GI.canvasY;
   }, false);
 
-  // Init first level
-  HardwareLayer.init();
-
-  // Start game loop
   Animator.start();
 }
 
 function goNextLevel() {
   GI.level++;
   Screen.clear();
+}
+
+function initWorld() {
+  HardwareLayer.init();
 }
 
 function updateAll() {
