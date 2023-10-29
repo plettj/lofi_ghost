@@ -320,6 +320,9 @@ const Ghost = {
   spritemap: null,
   spriteCol: 0,
   spriteRow: 0,
+  spriteColTable: [2, 0, 0, 2],
+  spriteRowTable: [0, 0, 1, 1],
+  animState: 0,
 
   spookRange: 0,
 
@@ -360,13 +363,9 @@ const Ghost = {
   },
 
   updateSprite: function() {
-    switch (this.direction) {
-      case Direction.NW: this.spriteCol = 2; break;
-      case Direction.NE: this.spriteCol = 1; break;
-      case Direction.SE: this.spriteCol = 0; break;
-      case Direction.SW: this.spriteCol = 3; break;
-    }
-    if (Animator.frame % 30 == 0) this.spriteRow = (this.spriteRow + 1) % 2;
+    this.animState = (Animator.frame % 30 == 0) ? (this.animState + 1) % 2 : this.animState;
+    this.spriteCol = this.spriteColTable[this.direction] + this.animState;
+    this.spriteRow = this.spriteRowTable[this.direction];
   },
 
   draw: function() {
