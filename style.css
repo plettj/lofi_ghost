@@ -35,3 +35,25 @@ canvas {
   left: calc((100% - var(--unit) * var(--width)) / 2);
   top: calc((100% - var(--unit) * var(--height)) / 2);
 }
+
+p {
+  z-index: 10;
+  position: absolute;
+  color: black;
+  width: calc(var(--unit) * 12);
+  font-size: calc(var(--unit) / 3);
+  text-align: left;
+
+  opacity: 0;
+  transition-duration: 1200ms;
+}
+
+#Intro1 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 2.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1);
+}
+
+#Intro2 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 2.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.5);
+}
