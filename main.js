@@ -163,14 +163,18 @@ const Assets = {
   scenesPath: "assets/scenes",
   scenes: [],
 
-  imagesLoaded: 0,
-  totalImageCount: 0,
+  sfxnames: ["Ghost Walking Loop", "Bug Footsteps loop", "Bug Scared", "Wire Connecting", "Cursor in terminal blinking loop", "Block Sliding Short", "Block Sliding Long", "Menu Button Click", "Menu Button Activation", "Metal Clinking"],
+  sfxPath: "assets/sfx",
+  sfx: [],
+
+  assetsLoaded: 0,
+  totalAssetCount: 0,
 
   init: function () {
-    this.totalImageCount = this.spritemapNames.length + this.backgroundNames.length + this.sceneNames.length
-    const handleAllImagesLoaded = () => {
-      this.imagesLoaded++;
-      if (this.imagesLoaded >= this.totalImageCount) {
+    this.totalAssetCount = this.spritemapNames.length + this.backgroundNames.length + this.sceneNames.length;
+    const handleAllAssetsLoaded = () => {
+      this.assetsLoaded++;
+      if (this.assetsLoaded >= this.totalAssetCount) {
         initWorld();
       }
     };
@@ -179,21 +183,27 @@ const Assets = {
       let image = new Image();
       image.src = this.spritemapsPath + "/" + this.spritemapNames[i] + ".png";
       this.spritemaps.push(new Spritemap(image));
-      image.onload = handleAllImagesLoaded;
+      image.onload = handleAllAssetsLoaded;
     }
 
     for (let i = 0; i < this.backgroundNames.length; ++i) {
       let image = new Image();
       image.src = this.backgroundsPath + "/" + this.backgroundNames[i] + ".png";
       this.backgrounds.push(image);
-      image.onload = handleAllImagesLoaded;
+      image.onload = handleAllAssetsLoaded;
     }
 
     for (let i = 0; i < this.sceneNames.length; ++i) {
       let image = new Image();
       image.src = this.scenesPath + "/" + this.sceneNames[i] + ".png";
       this.scenes.push(image);
-      image.onload = handleAllImagesLoaded;
+      image.onload = handleAllAssetsLoaded;
+    }
+
+    for (let i = 0; i < this.sfxnames.length; ++i) {
+      const src = this.sfxPath + "/" + this.sfxnames[i] + ".wav";
+      const audio = new Audio(src);
+      this.sfx.push(audio);
     }
   },
 }
@@ -372,6 +382,8 @@ const Ghost = {
 
   spookRange: 0,
 
+  sfxWalk: null,
+
   init: function() {
     this.spritemap = Assets.spritemaps[0];
     this.speed = GI.pixel * 0.1;
@@ -379,6 +391,11 @@ const Ghost = {
     this.decRadius = GI.unit;
     this.idleRadius = GI.unit / 4;
     this.spookRange = GI.unit * 2;
+
+    this.sfxWalk = Assets.sfx[0];
+    this.sfxWalk.volume = 0.015;
+    this.sfxWalk.loop = true;
+    this.sfxWalk.play();
   },
 
   update: function() {
@@ -459,10 +476,17 @@ class WireSlot {
     this.spriteCol = spriteCol;
     this.spriteRow = spriteRow;
     this.animState = 0;
+
+    this.sfxWired = Assets.sfx[3];
+    this.sfxWired.volume = 0.01;
+    this.sfxWiredPlayed = false;
   }
 
   update() {
-    //
+    if (this.activated && !this.sfxWiredPlayed) {
+      this.sfxWired.play();
+      this.sfxWiredPlayed = true;
+    }
   }
 
   draw() {
@@ -499,6 +523,14 @@ class WireBug {
     this.spriteCol = spriteCol;
     this.spriteRow = spriteRow;
     this.animState = 0;
+
+    this.sfxWalk = Assets.sfx[1];
+    this.sfxWalk.volume = 0.01;
+    this.sfxWalk.loop = true;
+    this.sfxWalk.play();
+
+    this.sfxScared = Assets.sfx[2];
+    this.sfxScared.volume = 0.04;
   }
 
   update() {
@@ -518,15 +550,18 @@ class WireBug {
           this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
           [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
           this.state = this.states.running;
+          this.sfxWalk.pause();
         } else {
           if (this.x == this.targetX && this.y == this.targetY) {
             [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 2 - GI.unit, this.y + Math.random() * GI.unit * 2 - GI.unit);
             this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+            if (this.sfxWalk.paused) this.sfxWalk.play();
           }
           this.moveToTarget(this.states.wander, this.walkSpeed);
         }
         break;
       case this.states.running:
+        this.sfxScared.play();
         this.moveToTarget(this.states.wander, this.runSpeed);
         break;
       case this.states.wiring:
@@ -960,7 +995,7 @@ function goNextLevel() {
 
 function initWorld() {
   // Use the below to skip to the gameplay!
-  // HardwareLayer.init(); GI.level = 2; return;
+  HardwareLayer.init(); GI.level = 2; return;
 
   if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
     GI.level = 1;
@@ -969,7 +1004,6 @@ function initWorld() {
   if (GI.startingLevel !== 0) {
     GI.level = GI.startingLevel;
   }
-
   getLayer(GI.level).init();
 }
 
