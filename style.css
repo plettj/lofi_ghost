@@ -2,6 +2,7 @@
   margin: 0;
   user-select: none;
   -webkit-user-select: none;
+  cursor: url('assets/icons/cursor.png'), auto;
 }
 
 @font-face {
