@@ -162,9 +162,10 @@ const Assets = {
   scenes: [],
 
   imagesLoaded: 0,
-  totalImageCount: 14,
+  totalImageCount: 0,
 
   init: function () {
+    this.totalImageCount = this.spritemapNames.length + this.backgroundNames.length + this.sceneNames.length
     const handleAllImagesLoaded = () => {
       this.imagesLoaded++;
       if (this.imagesLoaded >= this.totalImageCount) {
