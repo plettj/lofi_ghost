@@ -1208,7 +1208,6 @@ function goNextLevel() {
 
 function initWorld() {
   // Use the below to skip to the gameplay!
-  CLILayer.init(); GI.level = 3; return;
 
   // if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
   //   GI.level = 1;
