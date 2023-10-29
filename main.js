@@ -167,6 +167,8 @@ const Assets = {
   sfxPath: "assets/sfx",
   sfx: [],
 
+  song: null,
+
   assetsLoaded: 0,
   totalAssetCount: 0,
 
@@ -205,6 +207,10 @@ const Assets = {
       const audio = new Audio(src);
       this.sfx.push(audio);
     }
+
+    this.song = new Audio("assets/music/Main Menu.wav");
+    this.song.volume = 0.07;
+    this.song.loop = true;
   },
 }
 
@@ -647,6 +653,9 @@ class LetterBug {
 
     this.sfxScared = Assets.sfx[2];
     this.sfxScared.volume = 0.04;
+
+    this.holeTopSpriteMap = Assets.spritemaps[3];
+    this.holeBotSpriteMap = Assets.spritemaps[4];
   }
 
   burrow() {
@@ -703,6 +712,10 @@ class LetterBug {
   }
 
   draw() {
+    if (this.holeNum >= 0) {
+      Screen.covers.drawImage(this.holeTopSpriteMap.image, GI.pixel * 7, GI.pixel * 45, GI.pixel * 12, GI.pixel * 20);
+      Screen.objects.drawImage(this.holeBotSpriteMap.image, GI.pixel * 14, GI.pixel * 43, GI.pixel * 20, GI.pixel * 20);
+    }
     if (this.state != this.states.inactive) {
       if (Animator.frame % 15 == 0) this.animState = (this.animState + 1) % 2;
       this.spritemap.drawTile(Screen.bugs, this.spriteCol + this.animState, this.spriteRow, this.x, this.y, this.angle);
@@ -860,6 +873,7 @@ const IntroLayer = {
 
   init: function() {
     this.startFrame = Animator.frame;
+    Assets.song.play();
   },
 
   update: function() {
