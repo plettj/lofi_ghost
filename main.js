@@ -148,11 +148,11 @@ class Spritemap {
 }
 
 const Assets = {
-  spritemapNames: ["ghost", "bugs", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons"],
+  spritemapNames: ["ghost", "bugs", "hardwareTileset", "cliBreakTop", "cliBreakBottom", "buttons", "play"],
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
 
-  backgroundNames: ["hardware", "hardwareObjects", "cli", "menu"],
+  backgroundNames: ["hardware", "hardwareObjects", "cli", "menu", "splashScreen"],
   backgroundsPath: "assets/backgrounds",
   backgrounds: [],
 
@@ -560,6 +560,49 @@ const BaseMap = {
   }
 }
 
+const SplashLayer = {
+  hovered: false,
+  // Below are for PLAY button, in units
+  x: 6,
+  y: 6,
+  width: 4,
+  height: 2,
+
+  init: function() {
+    Screen.setBackground(Assets.scenes[0]);
+    console.log("wazzup");
+  },
+
+  draw: function() {
+    // Manually drawing the button cuz this is the only part of the code with a button like this ig
+    let context = Assets.spritemaps[6];
+
+    const [adjX, adjY] = [GI.cursorX / GI.unit, GI.cursorY / GI.unit];
+
+    if (adjX > this.x && adjX < this.x + this.width && adjY > this.y && adjY < this.y + this.height) {
+      hovered = true;
+    } else {
+      hovered = false;
+    }
+
+    context.save();
+    context.translate(GI.unit * this.x, GI.unit * this.y);
+    const yT = hovered ? 10 * 8 * this.width : 0;
+    context.drawImage(this.image, 0, yT, 10 * 8 * this.width, 10 * 8 * this.height, 0, 0, GI.unit * this.width, GI.unit * this.height); // clipping fix hack
+    context.restore();
+  }
+}
+
+const IntroLayer = {
+  init: function() {
+    Screen.setBackground(Assets.scenes[0]);
+  },
+
+  draw: function() {
+    //
+  }
+}
+
 const HardwareLayer = {
   sprites: [],
 
@@ -628,6 +671,7 @@ window.onload = () => {
     GI.cursorY = e.clientY - GI.canvasY;
   }, false);
 
+  // Start game loop
   Animator.start();
 }
 
