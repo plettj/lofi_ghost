@@ -139,7 +139,7 @@ class Spritemap {
   drawTile(context, x, y, destX, destY, angle) {
     context.save();
     context.translate(destX, destY);
-    if (angle !== undefined) context.rotate(angle * Math.PI / 180);
+    if (angle !== undefined) context.rotate(((angle + 90) % 360) * Math.PI / 180);
     context.translate(-GI.unit / 2, -GI.unit / 2);
     const [xT, yT] = this.getTileCoordinates(x, y);
     context.drawImage(this.image, xT + 1, yT + 1, GI.spriteSize - 2, GI.spriteSize - 2, 0, 0, GI.unit, GI.unit); // clipping fix hack
@@ -414,6 +414,7 @@ class WireSlot {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.activated = false;
     this.range = GI.unit * 2;
+    this.spritemap = Assets.spritemaps[2];
   }
 
   update() {
@@ -421,7 +422,9 @@ class WireSlot {
   }
 
   draw() {
-    //
+    if (this.activated) {
+      //
+    }
   }
 }
 
@@ -448,6 +451,7 @@ class WireBug {
     this.spritemap = Assets.spritemaps[1];
     this.spriteCol = 0;
     this.spriteRow = 0;
+    this.animState = 0;
   }
 
   update() {
@@ -496,6 +500,8 @@ class WireBug {
   }
 
   draw() {
+    if (Animator.frame % 15 == 0) this.animState = (this.animState + 1) % 2;
+    this.spriteCol = this.animState;
     this.spritemap.drawTile(Screen.bugs, this.spriteCol, this.spriteRow, this.x, this.y, this.angle);
   }
 };
@@ -564,11 +570,10 @@ const HardwareLayer = {
     this.sprites.push(Ghost);
 
     const wireSlot1 = new WireSlot(7, 7);
-    const wireBug1 = new WireBug(5, 5, wireSlot1);
-    // const wireSlot2 = new WireSlot(9, 7);
-    // const wireBug2 = new WireBug(6, 6, wireSlot2);
-    // this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
-    this.sprites.push(wireSlot1, wireBug1);
+    const wireBug1 = new WireBug(14, 5, wireSlot1);
+    const wireSlot2 = new WireSlot(9, 7);
+    const wireBug2 = new WireBug(13, 8, wireSlot2);
+    this.sprites.push(wireSlot1, wireSlot2, wireBug1, wireBug2);
   },
 
   update: function() {
