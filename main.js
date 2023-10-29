@@ -460,7 +460,7 @@ class WireSlot {
 }
 
 class WireBug {
-  constructor(tileX, tileY, wireSlot, spriteCol, spriteRow) {
+  constructor(tileX, tileY, wireSlots, spriteCol, spriteRow) {
     [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
     this.runSpeed = GI.pixel * 0.8;
     this.walkSpeed = GI.pixel * 0.1;
@@ -469,7 +469,8 @@ class WireBug {
     this.targetX = this.x;
     this.targetY = this.y;
 
-    this.wireSlot = wireSlot;
+    this.wireSlots = wireSlots;
+    this.slot = 0;
 
     this.state = 0;
     this.states = {
@@ -487,15 +488,19 @@ class WireBug {
   }
 
   update() {
-
     switch (this.state) {
       case this.states.wander:
-        if (dist(this.wireSlot.x, this.wireSlot.y, this.x, this.y) < this.wireSlot.range) {
-          this.targetX = this.wireSlot.x;
-          this.targetY = this.wireSlot.y;
-          this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
-          this.state = this.states.wiring;
-        } else if (dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+        for (let i = 0; i < this.wireSlots.length; ++i) {
+          const slot = this.wireSlots[i];
+          if (dist(slot.x, slot.y, this.x, this.y) < slot.range) {
+            this.slot = slot;
+            this.targetX = slot.x;
+            this.targetY = slot.y;
+            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+            this.state = this.states.wiring;
+          }
+        }
+        if (this.state == this.states.wander && dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
           this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
           [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
           this.state = this.states.running;
@@ -514,9 +519,14 @@ class WireBug {
         this.moveToTarget(this.states.wired, this.runSpeed);
         break;
       case this.states.wired:
-        this.wireSlot.activated = true;
-        this.state = this.states.inactive;
+        this.slot.activated = true;
+        this.wireSlots.splice(this.wireSlots.indexOf(this.slot), 1);
         HardwareLayer.score++;
+        if (this.wireSlots.length == 0) {
+          this.state = this.states.inactive;
+        } else {
+          this.state = this.states.wander;
+        }
         break;
     }
   }
@@ -544,7 +554,7 @@ const HardwareProgress = {
   x: 0,
   y: 0,
   spritemap: null,
-  progress: 4,
+  progress: 0,
   spriteCoords: [
     [[0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1]],
     [[0, 1, 2, 0, 1, 2], [2, 2, 2, 3, 3, 3]],
@@ -554,7 +564,7 @@ const HardwareProgress = {
   ],
 
   init: function() {
-    [this.x, this.y] = BaseMap.getTileCenter(5, 5);
+    [this.x, this.y] = [BaseMap.toCoords(55), BaseMap.toCoords(17)];
     this.spritemap = Assets.spritemaps[2];
   },
 
@@ -564,7 +574,11 @@ const HardwareProgress = {
 
   draw: function() {
     const [spriteCol, spriteRow] = this.spriteCoords[this.progress];
-    this.spritemap.drawTile(Screen.covers, spriteCol[0], spriteCol[0], this.x, this.y); // ?!?!?!
+    for (let i = 0; i < spriteCol.length; ++i) {
+      const offsetX = (i % 3) * GI.unit;
+      const offsetY = (Math.floor(i / 3)) * GI.unit;
+      this.spritemap.drawTile(Screen.covers, spriteCol[i], spriteRow[i], this.x + offsetX, this.y + offsetY);
+    }
   }
 };
 
@@ -790,27 +804,33 @@ const IntroLayer = {
 const HardwareLayer = {
   sprites: [],
   score: 0,
+  wave: 1,
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
 
     Ghost.init();
-    this.sprites.push(Ghost);
-
-    const wireSlotBlue = new WireSlot(21, 21, 3, 4);
-    const wireBugBlue = new WireBug(14, 0, wireSlotBlue, 0, 0);
-    const wireSlotPurple = new WireSlot(28, 28, 3, 5);
-    const wireBugPurple = new WireBug(12, 2, wireSlotPurple, 2, 0);
-    this.sprites.push(wireSlotBlue, wireSlotPurple, wireBugBlue, wireBugPurple);
-
     HardwareProgress.init();
-    this.sprites.push(HardwareProgress);
+    this.sprites.push([Ghost, HardwareProgress]);
+
+    const wireSlots = [new WireSlot(21, 21, 3, 4), new WireSlot(28, 28, 3, 5), new WireSlot(66, 60, 3, 0), new WireSlot(96, 46, 3, 1)];
+    const wireBugs = [new WireBug(14, 0, [wireSlots[0]], 0, 0), new WireBug(12, 2, [wireSlots[1]], 2, 0), new WireBug(1, 1, [wireSlots[2], wireSlots[3]], 2, 1)];
+    this.sprites.push([wireSlots[0], wireSlots[1], wireBugs[0], wireBugs[1], wireSlots[2], wireSlots[3]]);
+    this.sprites.push([wireBugs[2]]);
   },
 
   update: function() {
-    for (let i = 0; i < this.sprites.length; ++i) {
-      this.sprites[i].update();
-      BaseMap.fixSpriteInBounds(this.sprites[i]);
+    if (this.score == 4) {
+      GI.nextLevel = true;
+    }
+    if (this.score == 2 && this.wave == 1) {
+      this.wave++;
+    }
+    for (let i = 0; i <= this.wave; ++i) {
+      for (let j = 0; j < this.sprites[i].length; ++j) {
+        this.sprites[i][j].update();
+        BaseMap.fixSpriteInBounds(this.sprites[i][j]);
+      }
     }
   },
 
@@ -819,8 +839,10 @@ const HardwareLayer = {
     Screen.clear(Screen.objects);
     Screen.clear(Screen.covers);
     Screen.covers.drawImage(Assets.backgrounds[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
-    for (let i = 0; i < this.sprites.length; ++i) {
-      this.sprites[i].draw();
+    for (let i = 0; i <= this.wave; ++i) {
+      for (let j = 0; j < this.sprites[i].length; ++j) {
+        this.sprites[i][j].draw();
+      }
     }
   },
 }
