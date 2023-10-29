@@ -149,7 +149,7 @@ class Spritemap {
 }
 
 const Assets = {
-  spritemapNames: ["ghost", "hardwarebug"],
+  spritemapNames: ["ghost", "hardwarebug", "hardwareTileset, cliBreakTop, cliBreakBottom, buttons"],
   spritemapsPath: "assets/spritemaps",
   spritemaps: [],
 
