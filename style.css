@@ -57,3 +57,30 @@ p {
   left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 2.5);
   top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.5);
 }
+
+.cli {
+  position: absolute;
+  opacity: 1;
+  transition-duration: 1200ms;
+	color: #4cf965;
+  font-family: D_D;
+  font-size: calc(var(--unit) / 2.5);
+}
+
+#CLI1 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.5);
+}
+
+#CLI2 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.5);
+}
+
+input[type=text] {
+  z-index: 20;
+	appearance: none;
+	border: none;
+	outline: none;
+	background: transparent;
+}
