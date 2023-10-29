@@ -25,6 +25,7 @@ const GI = {
 
   // level
   level: 0,
+  startingLevel: 0,
   nextLevel: false, // Set this to true when you wanna move up; it's automatic
 
   init: function () {
@@ -350,7 +351,7 @@ const Ghost = {
   angle: 0,
   direction: Direction.NE,
 
-  bobbingAmplitude: 1.4,
+  bobbingAmplitude: 0.3,
   bobbingFrequency: 0.06,
   bobbingPhase: 0,
 
@@ -950,15 +951,15 @@ function initWorld() {
   // Use the below to skip to the gameplay!
   // HardwareLayer.init(); GI.level = 2; return;
 
-  if (!Storage.currentData["seenSplashScreen"]) {
-    SplashLayer.init();
-  } else { // Skip the splash screen; seen it already :P
+  if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
     GI.level = 1;
-    IntroLayer.init();
   }
 
-  // GI.level = 3;
-  // CLILayer.init();
+  if (GI.startingLevel !== 0) {
+    GI.level = GI.startingLevel;
+  }
+
+  getLayer(GI.level).init();
 }
 
 function updateAll() {
