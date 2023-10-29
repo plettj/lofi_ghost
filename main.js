@@ -25,7 +25,7 @@ const GI = {
 
   // level
   level: 0,
-  startingLevel: 0,
+  startingLevel: 3,
   nextLevel: false, // Set this to true when you wanna move up; it's automatic
 
   init: function () {
@@ -251,18 +251,29 @@ const Animator = {
 // EVENTS
 ///////////
 
-function keyPressed(code, pressed) {
+function keyPressed(code, pressed, event) {
   if (!Animator.paused || !pressed) {
-    if ((code == 37 || code == 65)) return; // Left
-    else if ((code == 38 || code == 87)) return; // Up
-    else if ((code == 39 || code == 68)) return; // Right
-    else if ((code == 40 || code == 83)) return; // Down
-    else if ((code == 80 || code == 82 || code == 27) && pressed) return; // P or R or [Esc]
+    if (GI.level == 3) { // CLI LEVEL
+      // console.log(code);
+      if (CLILayer.letters.includes(code) || CLILayer.allowedKeys.includes(code)) {
+
+      } else { // THAT KEY CAN"T BE PRESSED!
+        event.preventDefault();
+        return;
+      }
+    } else if (GI.level === 4) { // MENU LEVEL
+      // Moving
+      if ((code == 37 || code == 65)) return; // Left
+      else if ((code == 38 || code == 87)) return; // Up
+      else if ((code == 39 || code == 68)) return; // Right
+      else if ((code == 40 || code == 83)) return; // Down
+      else if ((code == 80 || code == 82 || code == 27) && pressed) return; // P or R or [Esc]
+    }
   }
 }
 
 document.addEventListener("keydown", (event) => {
-  let k = event.code;
+  let k = event.which;
 
   if (k == 9 || k == 38 || k == 40) {
     event.preventDefault();
@@ -271,11 +282,11 @@ document.addEventListener("keydown", (event) => {
     return false;
   }
 
-  keyPressed(k, 1);
+  keyPressed(k, 1, event);
 }, false);
 
 document.addEventListener("keyup", (event) => {
-	keyPressed(event.code, 0);
+	keyPressed(event.which, 0, event);
 });
 
 document.addEventListener("mousedown", (event) => {
@@ -903,9 +914,12 @@ const CLILayer = {
   sprites: [],
   stage: 0, // 0-"game help" 1-"page" 2-"page" 3-"move"
 
+  letters: [65, 69, 71, 72, 76, 77, 80],
+  allowedKeys: [9, 16, 32, 37, 39, 13, 8, 46], // We allow pressing space, shift, arrow keys, backspace, delete, and tab
+
   stageFrame: 0, // number of frames since you entered the current stage of this level.
 
-  menuItems: document.querySelector(".cli"), // [letters, str1, input1, str2, input2, str3, input3, str4, input4]
+  menuItems: document.getElementsByClassName("cli"), // [letters, str1, input1, str2, input2, str3, input3, str4, input4]
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
@@ -928,21 +942,19 @@ const CLILayer = {
     const step = Animator.frame - this.stageFrame;
     const cliDelay = 30;
 
-    if (step == 30) {
+    if (step == cliDelay) {
       // Initialize the current stage of the CLI level
       switch (this.stage) {
         case 0:
-          menuItems[0].style.opacity = 1;
-          menuItems[1].style.opacity = 1;
-          menuItems[2].style.opacity = 1;
-          menuItems[2].focus();
+          this.menuItems[0].style.opacity = 1;
+          this.menuItems[1].style.opacity = 1;
+          this.menuItems[2].style.opacity = 1;
+          this.menuItems[2].focus();
           break;
       }
     }
 
-    if (step >= transitions[transitions.length - 1]) {
-      GI.nextLevel = true;
-    }
+    // Next level: GI.nextLevel = true;
   },
 
   draw: function() {
@@ -1012,15 +1024,15 @@ function goNextLevel() {
 
 function initWorld() {
   // Use the below to skip to the gameplay!
-  HardwareLayer.init(); GI.level = 2; return;
 
-  if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
-    GI.level = 1;
-  }
+  // if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
+  //   GI.level = 1;
+  // }
 
   if (GI.startingLevel !== 0) {
     GI.level = GI.startingLevel;
   }
+
   getLayer(GI.level).init();
 }
 
