@@ -256,7 +256,9 @@ function keyPressed(code, pressed, event) {
     if (GI.level == 3) { // CLI LEVEL
       // console.log(code);
       if (CLILayer.letters.includes(code) || CLILayer.allowedKeys.includes(code)) {
-
+        if (code === 13) {
+          CLILayer.enterPressed();
+        }
       } else { // THAT KEY CAN"T BE PRESSED!
         event.preventDefault();
         return;
@@ -1018,6 +1020,7 @@ const CLILayer = {
   stageFrame: 0, // number of frames since you entered the current stage of this level.
 
   menuItems: document.getElementsByClassName("cli"), // [letters, str1, input1, str2, input2, str3, input3, str4, input4]
+  activeInput: -1,
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[0]);
@@ -1043,6 +1046,8 @@ const CLILayer = {
     const step = Animator.frame - this.stageFrame;
     const cliDelay = 30;
 
+    console.log(step);
+
     if (step == cliDelay) {
       // Initialize the current stage of the CLI level
       switch (this.stage) {
@@ -1050,8 +1055,16 @@ const CLILayer = {
           this.menuItems[0].style.opacity = 1;
           this.menuItems[1].style.opacity = 1;
           this.menuItems[2].style.opacity = 1;
-          this.menuItems[2].focus();
+
+          this.activeInput = 2;
+          this.menuItems[this.activeInput].focus();
           break;
+        case 1:
+          this.menuItems[3].style.opacity = 1;
+          this.menuItems[4].style.opacity = 1;
+
+          this.activeInput = 4;
+          this.menuItems[this.activeInput].focus();
       }
     }
 
@@ -1063,6 +1076,18 @@ const CLILayer = {
     Screen.clear(Screen.objects);
     for (let i = 0; i < this.sprites.length; ++i) {
       this.sprites[i].draw();
+    }
+  },
+
+  enterPressed: function() {
+    const inputVal = this.menuItems[this.activeInput].value.trim();
+
+    if (this.stage === 0) {
+      console.log(inputVal)
+      if (inputVal == "game help") {
+        this.stage++;
+        this.stageFrame = Animator.frame;
+      }
     }
   }
 }

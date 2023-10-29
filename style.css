@@ -83,7 +83,17 @@ p {
 
 #CLI2 {
   left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
-  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.2);
+}
+
+#CLI3 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.9);
+}
+
+#CLI4 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 4.6);
 }
 
 input[type=text] {
@@ -93,4 +103,5 @@ input[type=text] {
 	border: none;
 	outline: none;
 	background: transparent;
+	color: #96fba6;
 }
