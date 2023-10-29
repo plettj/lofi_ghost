@@ -404,7 +404,7 @@ const Ghost = {
     this.spookRange = GI.unit * 2;
 
     this.sfxWalk = Assets.sfx[0];
-    this.sfxWalk.volume = 0.015;
+    this.sfxWalk.volume = 0.03;
     this.sfxWalk.loop = true;
     this.sfxWalk.play();
   },
@@ -489,7 +489,7 @@ class WireSlot {
     this.animState = 0;
 
     this.sfxWired = Assets.sfx[3];
-    this.sfxWired.volume = 0.01;
+    this.sfxWired.volume = 0.05;
     this.sfxWiredPlayed = false;
   }
 
@@ -536,12 +536,12 @@ class WireBug {
     this.animState = 0;
 
     this.sfxWalk = Assets.sfx[1];
-    this.sfxWalk.volume = 0.01;
+    this.sfxWalk.volume = 0.03;
     this.sfxWalk.loop = true;
     this.sfxWalk.play();
 
     this.sfxScared = Assets.sfx[2];
-    this.sfxScared.volume = 0.04;
+    this.sfxScared.volume = 0.05;
   }
 
   update() {
@@ -583,6 +583,104 @@ class WireBug {
         this.wireSlots.splice(this.wireSlots.indexOf(this.slot), 1);
         HardwareLayer.score++;
         if (this.wireSlots.length == 0) {
+          this.state = this.states.inactive;
+        } else {
+          this.state = this.states.wander;
+        }
+        break;
+    }
+  }
+
+  moveToTarget(nextState, speed) {
+    if (dist(this.x, this.y, this.targetX, this.targetY) > speed) {
+      this.x += dcos(this.angle) * speed;
+      this.y += dsin(this.angle) * speed;
+    } else {
+      this.x = this.targetX;
+      this.y = this.targetY;
+      this.state = nextState;
+    }
+  }
+
+  draw() {
+    if (this.state != this.states.inactive) {
+      if (Animator.frame % 15 == 0) this.animState = (this.animState + 1) % 2;
+      this.spritemap.drawTile(Screen.bugs, this.spriteCol + this.animState, this.spriteRow, this.x, this.y, this.angle);
+    }
+  }
+};
+
+class LetterBug {
+  constructor(tileX, tileY) {
+    [this.x, this.y] = BaseMap.getTileCenter(tileX, tileY);
+    this.runSpeed = GI.pixel * 0.8;
+    this.walkSpeed = GI.pixel * 0.1;
+    this.angle = 0;
+    this.runDist = GI.unit;
+    this.targetX = this.x;
+    this.targetY = this.y;
+
+    this.holeX = GI.pixel * 20;
+    this.holeY = GI.pixel * 55;
+    this.holeNum = 0;
+
+    this.state = 0;
+    this.states = {
+      wander: 0,
+      running: 1,
+      holing: 2,
+      holed: 3,
+      inactive: 4,
+    }
+
+    this.spritemap = Assets.spritemaps[1];
+    this.spriteCol = 0;
+    this.spriteRow = 1;
+    this.animState = 0;
+
+    this.sfxWalk = Assets.sfx[1];
+    this.sfxWalk.volume = 0.01;
+    this.sfxWalk.loop = true;
+    this.sfxWalk.play();
+
+    this.sfxScared = Assets.sfx[2];
+    this.sfxScared.volume = 0.04;
+  }
+
+  burrow() {
+    this.state = this.states.holing;
+  }
+
+  update() {
+    switch (this.state) {
+      case this.states.wander:
+        if (this.state == this.states.wander && dist(Ghost.x, Ghost.y, this.x, this.y) < Ghost.spookRange) {
+          this.angle = reverseAngle(calcAngle2(this.x - Ghost.x, this.y - Ghost.y));
+          [this.targetX, this.targetY] = BaseMap.clamp(this.x + this.runDist * dcos(this.angle), this.y + this.runDist * dsin(this.angle));
+          this.state = this.states.running;
+          this.sfxWalk.pause();
+        } else {
+          if (this.x == this.targetX && this.y == this.targetY) {
+            [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 2 - GI.unit, this.y + Math.random() * GI.unit * 2 - GI.unit);
+            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+            if (this.sfxWalk.paused) this.sfxWalk.play();
+          }
+          this.moveToTarget(this.states.wander, this.walkSpeed);
+        }
+        break;
+      case this.states.running:
+        this.sfxScared.play();
+        this.moveToTarget(this.states.wander, this.runSpeed);
+        break;
+      case this.states.holing:
+        this.targetX = this.holeX;
+        this.targetY = this.holeY;
+        this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
+        this.moveToTarget(this.states.holed, this.runSpeed);
+        break;
+      case this.states.holed:
+        this.holeNum++;
+        if (this.holeNum == 2) {
           this.state = this.states.inactive;
         } else {
           this.state = this.states.wander;
@@ -931,6 +1029,9 @@ const CLILayer = {
     Ghost.init();
     Ghost.cage(true); // Put the ghost in the cage :).
     this.sprites.push(Ghost);
+
+    const letterBug = new LetterBug(10, 10);
+    this.sprites.push(letterBug);
   },
 
   update: function() {
@@ -1024,6 +1125,7 @@ function goNextLevel() {
 
 function initWorld() {
   // Use the below to skip to the gameplay!
+  CLILayer.init(); GI.level = 3; return;
 
   // if (Storage.currentData["seenSplashScreen"]) { // Skip the splash screen; seen it already :P
   //   GI.level = 1;
