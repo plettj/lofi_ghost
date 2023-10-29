@@ -1145,6 +1145,7 @@ const CLILayer = {
         this.stage++;
         this.stageFrame = Animator.frame;
         this.sprites[0].cage(false);
+        GI.nextLevel = true;
       }
     }
   }
@@ -1152,7 +1153,7 @@ const CLILayer = {
 
 const MenuLayer = {
   init: function() {
-    //
+    Screen.setBackground(Assets.backgrounds[3]);
   },
 
   update: function() {
