@@ -167,6 +167,8 @@ const Assets = {
   sfxPath: "assets/sfx",
   sfx: [],
 
+  song: null,
+
   assetsLoaded: 0,
   totalAssetCount: 0,
 
@@ -205,6 +207,10 @@ const Assets = {
       const audio = new Audio(src);
       this.sfx.push(audio);
     }
+
+    this.song = new Audio("assets/music/Main Menu.wav");
+    this.song.volume = 0.07;
+    this.song.loop = true;
   },
 }
 
@@ -867,6 +873,7 @@ const IntroLayer = {
 
   init: function() {
     this.startFrame = Animator.frame;
+    Assets.song.play();
   },
 
   update: function() {
