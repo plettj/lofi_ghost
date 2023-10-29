@@ -38,10 +38,9 @@ const GI = {
 }
 
 const Storage = {
-  storedName: "UWGameJam_SavedData",
-  splashScreen: false, // Whether to display the splash screen on game load
+  storedName: "Lo-fi_Ghost_Game_Data",
   currentData: { // All save-able game data goes here!
-    "progress": 0,
+    "seenSplashScreen": false,
   },
 
   init: function () {
@@ -52,11 +51,12 @@ const Storage = {
     } else { // Update our data based on what was saved.
       this.currentData = JSON.parse(savedData);
 
-      if (this.currentData["progress"] === 0) {
+      if (!this.currentData["seenSplashScreen"]) {
         this.splashScreen = true;
       }
     }
   },
+
   store: function () {
     localStorage.setItem(this.storedName, JSON.stringify(this.currentData));
   }
@@ -290,6 +290,10 @@ function clamp(x, a, b) {
 
 function dist(x1, y1, x2, y2  ) {
   return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+}
+
+function average(a, b) {
+  return (a + b) / 2;
 }
 
 function calcAngle2(dx, dy) {
@@ -584,10 +588,12 @@ const SplashLayer = {
       this.hovered = false;
     }
 
-    console.log(GI.clicked);
-
     if (this.hovered && GI.clicked) {
       GI.nextLevel = true;
+
+      // Save that we've passed the splash screen!
+      Storage.currentData["seenSplashScreen"] = true;
+      Storage.store();
     }
   },
 
@@ -605,16 +611,152 @@ const SplashLayer = {
 }
 
 const IntroLayer = {
+  startFrame: 0, // When the animation began.
+
+  dayAmount: 100, // Between 0 and 100, how much day there is!
+  lifeAmount: 100, // Between 0 and 100, how much life she has!
+
+  dayDirection: false,
+  overallFade: 1, // Starts at 1. If it's at < 1, we're fading and ending!
+
   init: function() {
-    Screen.setBackground(Assets.scenes[0]);
+    this.startFrame = Animator.frame;
   },
 
   update: function() {
-    //
+    const step = Animator.frame - this.startFrame;
+    const transitions = [0, 100, 300, 400, 1000, 1260];
+    let stage = 0;
+
+    while (!between(step, transitions[stage] - 1, transitions[stage + 1]) && stage < transitions.length - 1) {
+      stage++;
+    }
+
+    switch (stage) {
+      case 0:
+        this.dayAmount = 100;
+        this.lifeAmount = 100;
+        break;
+      case 1:
+        this.dayAmount -= 0.5;
+        break;
+      case 2:
+        this.dayAmount += 1;
+        break;
+      case 3:
+      case 4:
+        if (this.dayDirection) {
+          this.dayAmount += 2.5;
+          if (this.dayAmount >= 100) {
+            this.dayAmount = 100;
+            this.dayDirection = false;
+          }
+        } else {
+          this.dayAmount -= 2;
+          if (this.dayAmount <= 0) {
+            this.dayAmount = 0;
+            this.dayDirection = true;
+          }
+        }
+        
+        this.lifeAmount -= 0.25;
+        if (this.lifeAmount < 0) {
+          this.lifeAmount = 0;
+        }
+
+        if (stage === 4) { // ENDING
+          this.overallFade -= 0.005;
+
+          if (this.overallFade <= 0) {
+            this.overallFade = 0;
+          }
+        }
+        break;
+    }
+
+    if (step >= transitions[transitions.length - 1]) {
+      GI.nextLevel = true;
+    }
   },
 
   draw: function() {
-    //
+    // sceneNames: ["introDay", "introDayDead", "introNight", "introNightDead"],
+
+    // Draw all the things then set their 
+    // background: null,
+    // objects: null,
+    // bugs: null,
+    // ghost: null,
+
+    Screen.background.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
+
+    Screen.objects.globalAlpha = clamp(this.dayAmount * -1 / 100 + 1, 0, 1) * this.overallFade;
+    
+    //console.log(this.dayAmount);
+    //console.log(Screen.objects.globalAlpha);
+
+    Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    Screen.objects.globalAlpha = 1;
+
+    if (this.lifeAmount < 99) {
+      Screen.bugs.globalAlpha = clamp(average(this.lifeAmount * -1 / 100 + 1, this.dayAmount / 100), 0, 1) * this.overallFade;
+      Screen.bugs.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      Screen.bugs.globalAlpha = 1;
+
+      Screen.ghost.globalAlpha = clamp(average(this.lifeAmount * -1 / 100 + 1, this.dayAmount * -1 / 100 + 1), 0, 1) * this.overallFade;
+      Screen.ghost.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+      Screen.ghost.globalAlpha = 1;
+    }
+
+
+    
+    // if (this.lifeAmount > 50 && this.dayAmount > 50) {
+    //   Screen.background.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
+
+    //   if (this.lifeAmount > 99 && this.dayAmount < 100) { // 100% life, 50-100 day!
+    //     Screen.objects.globalAlpha = this.dayAmount * -1 / 100 + 1;
+    //     Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //   } else if (this.lifeAmount < 100 && this.dayAmount > 99) { // 50-100% life, 100 day!
+    //     Screen.objects.globalAlpha = this.lifeAmount * -1 / 100 + 1;
+    //     Screen.objects.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //   } else { // 50-99 life, 50-99 day!
+    //     Screen.objects.globalAlpha = this.dayAmount * -1 / 100 + 1;
+    //     Screen.bugs.globalAlpha = this.lifeAmount * -1 / 100 + 1;
+    //     if (this.dayAmount < this.lifeAmount) {
+    //       Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //       Screen.bugs.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //     } else {
+    //       Screen.bugs.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //       Screen.objects.drawImage(Assets.scenes[2], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //     }
+    //     Screen.bugs.globalAlpha = 1;
+    //   }
+      
+    //   Screen.objects.globalAlpha = 1;
+    // } else if (this.lifeAmount <= 50 && this.dayAmount > 50) {
+    //   Screen.background.drawImage(Assets.scenes[1], 0, 0, GI.canvasWidth, GI.canvasHeight);
+
+    //   if (this.lifeAmount < 1 && this.dayAmount < 100) { // 0% life, 50-100 day!
+    //     Screen.objects.globalAlpha = this.dayAmount * -1 / 100 + 1;
+    //     Screen.objects.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //   } else if (this.lifeAmount > 0 && this.dayAmount > 99) { // 0-50% life, 100 day!
+    //     Screen.objects.globalAlpha = this.lifeAmount * -1 / 100 + 1;
+    //     Screen.objects.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //   } else { // 50-99 life, 50-99 day!
+    //     Screen.objects.globalAlpha = this.dayAmount * -1 / 100 + 1;
+    //     Screen.bugs.globalAlpha = this.lifeAmount * -1 / 100 + 1;
+    //     if (this.dayAmount < this.lifeAmount) {
+    //       Screen.objects.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //       Screen.bugs.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //     } else {
+    //       Screen.bugs.drawImage(Assets.scenes[0], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //       Screen.objects.drawImage(Assets.scenes[3], 0, 0, GI.canvasWidth, GI.canvasHeight);
+    //     }
+    //     Screen.bugs.globalAlpha = 1;
+    //   }
+      
+    //   Screen.objects.globalAlpha = 1;
+    // }
   }
 }
 
@@ -720,10 +862,15 @@ function goNextLevel() {
 }
 
 function initWorld() {
-  // START FIRST LEVEL
+  // Use the below to skip to the gameplay!
+  // HardwareLayer.init(); GI.level = 2; return;
 
-  SplashLayer.init();
-  //HardwareLayer.init();
+  if (!Storage.currentData["seenSplashScreen"]) {
+    SplashLayer.init();
+  } else { // Skip the splash screen; seen it already :P
+    GI.level = 1;
+    IntroLayer.init();
+  }
 }
 
 function updateAll() {
