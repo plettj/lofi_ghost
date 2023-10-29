@@ -70,9 +70,10 @@ p {
 }
 
 #CLI0 {
-  font-size: calc(var(--unit) / 5);
-  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.1);
-  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.5);
+  font-size: calc(var(--unit) / 4.5);
+  text-align: right;
+  right: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.875);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.58);
 }
 
 #CLI1 {
@@ -87,6 +88,7 @@ p {
 
 input[type=text] {
   z-index: 20;
+  width: calc(var(--unit) * 11);
 	appearance: none;
 	border: none;
 	outline: none;
