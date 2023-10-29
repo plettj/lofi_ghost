@@ -65,6 +65,8 @@ p {
 	color: #4cf965;
   font-family: D_D;
   font-size: calc(var(--unit) / 2.5);
+
+  opacity: 0;
 }
 
 #CLI1 {

@@ -666,7 +666,7 @@ const SplashLayer = {
 
   init: function() {
     Screen.setBackground(Assets.backgrounds[4]);
-    exists = true;
+    this.exists = true;
   },
 
   update: function() {
