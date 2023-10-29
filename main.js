@@ -1065,6 +1065,29 @@ const CLILayer = {
 
           this.activeInput = 4;
           this.menuItems[this.activeInput].focus();
+          break;
+        case 2:
+          this.menuItems[5].style.opacity = 1;
+
+          this.activeInput = 5;
+          this.menuItems[this.activeInput].focus();
+          break;
+        case 3:
+          this.menuItems[0].style.opacity = 0;
+          this.menuItems[1].style.opacity = 0;
+          this.menuItems[2].style.opacity = 0;
+          this.menuItems[3].style.opacity = 0;
+          this.menuItems[4].style.opacity = 0;
+          this.menuItems[5].style.opacity = 0;
+
+          setTimeout(function () {
+            CLILayer.menuItems[6].style.opacity = 1;
+            CLILayer.menuItems[7].style.opacity = 1;
+
+            CLILayer.activeInput = 7;
+            CLILayer.menuItems[CLILayer.activeInput].focus();
+          }, 400);
+          break;
       }
     }
 
@@ -1083,10 +1106,31 @@ const CLILayer = {
     const inputVal = this.menuItems[this.activeInput].value.trim();
 
     if (this.stage === 0) {
-      console.log(inputVal)
       if (inputVal == "game help") {
         this.stage++;
         this.stageFrame = Animator.frame;
+      }
+    } else if (this.stage === 1) {
+      if (inputVal == "leap") {
+        this.stage++;
+        this.stageFrame = Animator.frame;
+        this.sprites[1].burrow();
+        this.letters.push(79);
+        this.menuItems[0].innerHTML = "Letters: A E G H L M O P";
+      }
+    } else if (this.stage === 2) {
+      if (inputVal == "go") {
+        this.stage++;
+        this.stageFrame = Animator.frame;
+        this.sprites[1].burrow();
+        this.letters.push(86);
+        this.menuItems[0].innerHTML = "Letters: A E G H L M O P V";
+      }
+    } else if (this.stage === 3) {
+      if (inputVal == "move") {
+        this.stage++;
+        this.stageFrame = Animator.frame;
+        this.sprites[0].cage(false);
       }
     }
   }

@@ -93,7 +93,22 @@ p {
 
 #CLI4 {
   left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
-  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 4.6);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 4.7);
+}
+
+#CLI5 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 5.4);
+}
+
+#CLI6 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 1.5);
+}
+
+#CLI7 {
+  left: calc((100% - var(--unit) * var(--width)) / 2 + var(--unit) * 1.5);
+  top: calc((100% - var(--unit) * var(--height)) / 2 + var(--unit) * 2.2);
 }
 
 input[type=text] {
