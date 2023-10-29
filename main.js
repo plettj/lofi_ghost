@@ -455,7 +455,6 @@ class WireBug {
         } else {
           if (this.x == this.targetX && this.y == this.targetY) {
             [this.targetX, this.targetY] = BaseMap.clamp(this.x + Math.random() * GI.unit * 4 - 2 * GI.unit, this.y + Math.random() * GI.unit * 4 - 2 * GI.unit);
-            this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
           }
           this.moveToTarget(this.states.wander, this.walkSpeed);
         }
@@ -472,6 +471,7 @@ class WireBug {
   }
 
   moveToTarget(nextState, speed) {
+    this.angle = calcAngle2(this.x - this.targetX, this.y - this.targetY);
     if (dist(this.x, this.y, this.targetX, this.targetY) > speed) {
       this.x += dcos(this.angle) * speed;
       this.y += dsin(this.angle) * speed;
