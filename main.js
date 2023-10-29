@@ -544,7 +544,7 @@ const HardwareProgress = {
   x: 0,
   y: 0,
   spritemap: null,
-  progress: 4,
+  progress: 0,
   spriteCoords: [
     [[0, 1, 2, 0, 1, 2], [0, 0, 0, 1, 1, 1]],
     [[0, 1, 2, 0, 1, 2], [2, 2, 2, 3, 3, 3]],
@@ -554,7 +554,7 @@ const HardwareProgress = {
   ],
 
   init: function() {
-    [this.x, this.y] = BaseMap.getTileCenter(5, 5);
+    [this.x, this.y] = [BaseMap.toCoords(55), BaseMap.toCoords(17)];
     this.spritemap = Assets.spritemaps[2];
   },
 
@@ -564,7 +564,11 @@ const HardwareProgress = {
 
   draw: function() {
     const [spriteCol, spriteRow] = this.spriteCoords[this.progress];
-    this.spritemap.drawTile(Screen.covers, spriteCol[0], spriteCol[0], this.x, this.y); // ?!?!?!
+    for (let i = 0; i < spriteCol.length; ++i) {
+      const offsetX = (i % 3) * GI.unit;
+      const offsetY = (Math.floor(i / 3)) * GI.unit;
+      this.spritemap.drawTile(Screen.covers, spriteCol[i], spriteRow[i], this.x + offsetX, this.y + offsetY);
+    }
   }
 };
 
