@@ -25,7 +25,7 @@ const GI = {
 
   // level
   level: 0,
-  startingLevel: 0,
+  startingLevel: 1,
   nextLevel: false, // Set this to true when you wanna move up; it's automatic
 
   init: function () {
